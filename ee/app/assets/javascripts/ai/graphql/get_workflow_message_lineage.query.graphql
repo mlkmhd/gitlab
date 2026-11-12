@@ -1,0 +1,21 @@
+# @feature_category: duo_agent_platform
+query getWorkflowMessageLineage($workflowId: AiDuoWorkflowsWorkflowID!, $before: String) {
+  duoWorkflowWorkflows(workflowId: $workflowId) {
+    nodes {
+      id
+      latestCheckpoint {
+        messages(last: 100, before: $before) @gl_introduced(version: "19.6.0") {
+          nodes {
+            messageId
+            threadTs
+            parentTs
+          }
+          pageInfo {
+            startCursor
+            hasPreviousPage
+          }
+        }
+      }
+    }
+  }
+}

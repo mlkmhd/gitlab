@@ -1,0 +1,36 @@
+# @feature_category: compliance_management
+query frameworksNeedsAttention($groupPath: ID!) {
+  group(fullPath: $groupPath) {
+    id
+    complianceFrameworksNeedingAttention {
+      nodes {
+        id
+        framework {
+          id
+          name
+          color
+          securityPolicies {
+            nodes {
+              name
+              type
+              source {
+                ... on GroupSecurityPolicySource {
+                  namespace {
+                    id
+                    fullPath
+                  }
+                }
+              }
+            }
+          }
+        }
+        projectsCount
+        requirementsCount
+        requirementsWithoutControls {
+          id
+          name
+        }
+      }
+    }
+  }
+}

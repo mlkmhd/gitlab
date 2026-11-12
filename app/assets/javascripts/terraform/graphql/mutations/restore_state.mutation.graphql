@@ -1,0 +1,6 @@
+# @feature_category: infrastructure_as_code
+mutation restoreState($stateID: TerraformStateID!) {
+  terraformStateRestore(input: { id: $stateID }) {
+    errors
+  }
+}

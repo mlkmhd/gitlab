@@ -1,0 +1,22 @@
+#import "~/issuable/popover/queries/base_work_item_popover.fragment.graphql"
+#import "~/issuable/popover/queries/base_work_item_popover_features.fragment.graphql"
+#import "ee/work_items/list/graphql/work_item_feature_status.fragment.graphql"
+
+query workItemPopoverEE($fullPath: ID!, $iid: String!) {
+  namespace(fullPath: $fullPath) {
+    id
+    workItem(iid: $iid) {
+      ...BaseWorkItemPopover
+
+      features {
+        ...BaseWorkItemPopoverFeatures
+        weight {
+          weight
+        }
+        status {
+          ...WorkItemFeatureStatus
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+fragment WorkItemMetadataWidgets on WorkItemWidget {
+  type
+}

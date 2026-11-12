@@ -1,0 +1,13 @@
+# @feature_category: security_policy_management
+query getFile($fullPath: ID!, $filePath: String!, $ref: String) {
+  project(fullPath: $fullPath) {
+    id
+    repository {
+      blobs(paths: [$filePath], ref: $ref) {
+        nodes {
+          id
+        }
+      }
+    }
+  }
+}

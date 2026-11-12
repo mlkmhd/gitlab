@@ -1,0 +1,28 @@
+# @feature_category: duo_agent_platform
+
+query getCatalogConsumerItems($projectId: ProjectID!, $itemTypes: [AiCatalogItemType!]) {
+  aiCatalogConfiguredItems(projectId: $projectId, itemTypes: $itemTypes) {
+    nodes {
+      id
+      item {
+        id
+        name
+        itemType
+        foundationalFlowReference
+        ... on AiCatalogFlow {
+          acceptsTriggerGoal
+          schedulable @gl_introduced(version: "19.6.0")
+        }
+        ... on AiCatalogThirdPartyFlow {
+          acceptsTriggerGoal
+        }
+      }
+      parentItemConsumer {
+        id
+        serviceAccount {
+          id
+        }
+      }
+    }
+  }
+}

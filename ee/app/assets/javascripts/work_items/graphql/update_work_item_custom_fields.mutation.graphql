@@ -1,0 +1,18 @@
+# @feature_category: team_planning
+
+#import "./work_item_custom_field_values.fragment.graphql"
+
+mutation workItemUpdateCustomFields($input: WorkItemUpdateInput!) {
+  workItemUpdate(input: $input) {
+    workItem {
+      id
+
+      features {
+        customFields {
+          ...WorkItemCustomFieldValuesFragment
+        }
+      }
+    }
+    errors
+  }
+}

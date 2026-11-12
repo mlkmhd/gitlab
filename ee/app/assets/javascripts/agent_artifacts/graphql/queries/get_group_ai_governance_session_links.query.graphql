@@ -1,0 +1,63 @@
+# @feature_category: ai_agents
+query getGroupAiGovernanceSessionLinks($groupFullPath: ID!, $id: AiGovernanceSessionID!) {
+  group(fullPath: $groupFullPath) {
+    id
+    aiGovernanceSessions(id: $id) {
+      nodes {
+        id
+        mergeRequestLinks(first: 20) {
+          pageInfo {
+            hasNextPage
+          }
+          nodes {
+            id
+            linkType
+            mergeRequest {
+              id
+              title
+              reference
+              webPath
+            }
+          }
+        }
+        noteLinks(first: 20) {
+          pageInfo {
+            hasNextPage
+          }
+          nodes {
+            id
+            linkType
+            note {
+              id
+              url
+              author {
+                id
+                name
+              }
+            }
+          }
+        }
+        workItemLinks(first: 20) {
+          pageInfo {
+            hasNextPage
+          }
+          nodes {
+            id
+            linkType
+            workItem {
+              id
+              title
+              reference
+              webPath
+              workItemType {
+                id
+                name
+                iconName
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

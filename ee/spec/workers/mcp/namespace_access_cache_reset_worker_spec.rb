@@ -1,0 +1,106 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe Mcp::NamespaceAccessCacheResetWorker, feature_category: :mcp_server do
+  let_it_be(:group) { create(:group) }
+  let_it_be(:project) { create(:project, group: group) }
+  let_it_be(:sub_group) { create(:group, parent: group) }
+
+  let_it_be(:group_member) { create(:group_member, group: group, user: create(:user)) }
+  let_it_be(:sub_group_member) { create(:group_member, group: sub_group, user: create(:user)) }
+  let_it_be(:project_member) { create(:project_member, project: project, user: create(:user)) }
+
+  let(:source_id) { group.id }
+  let(:data) { { group_id: source_id } }
+  let(:event) { Mcp::ServerSettingsChangedEvent.new(data: data) }
+
+  it_behaves_like 'worker with data consistency', described_class, data_consistency: :delayed
+  it_behaves_like 'subscribes to event'
+
+  it 'reschedules a deduplicated job once' do
+    expect(described_class.get_deduplicate_strategy).to eq(:until_executed)
+    expect(described_class.get_deduplication_options).to include(if_deduplicated: :reschedule_once)
+  end
+
+  it 'has a concurrency limit' do
+    expect(described_class.get_concurrency_limit).to eq(10)
+  end
+
+  it 'defers on the members table health signal' do
+    expect(described_class.database_health_check_attrs).to include(
+      gitlab_schema: :gitlab_main, tables: %i[members], delay_by: 10.minutes
+    )
+  end
+
+  context 'when group cannot be found' do
+    let(:source_id) { non_existing_record_id }
+
+    it 'does not clear cache' do
+      expect(User).not_to receive(:clear_group_with_mcp_server_enabled_cache)
+
+      consume_event(subscriber: described_class, event: event)
+    end
+  end
+
+  context 'when group is found' do
+    let(:affected_user_ids) { [group_member.user.id, sub_group_member.user.id, project_member.user.id] }
+
+    it 'clears MCP cache for affected users regardless of AI license' do
+      expect(User).to receive(:clear_group_with_mcp_server_enabled_cache).with(match_array(affected_user_ids))
+
+      consume_event(subscriber: described_class, event: event)
+    end
+  end
+
+  context 'when a user is a member multiple times' do
+    let_it_be(:duplicate_member) { create(:group_member, group: sub_group, user: project_member.user) }
+
+    let(:affected_user_ids) { [group_member.user.id, sub_group_member.user.id, project_member.user.id] }
+
+    it 'deduplicates users before clearing cache' do
+      expect(User).to receive(:clear_group_with_mcp_server_enabled_cache).with(match_array(affected_user_ids))
+
+      consume_event(subscriber: described_class, event: event)
+    end
+  end
+
+  context 'when the hierarchy has more members than one batch' do
+    before do
+      stub_const('Ai::HierarchyMemberUserIds::MEMBER_BATCH_SIZE', 1)
+    end
+
+    it 'clears MCP cache one batch at a time' do
+      cleared_user_ids = []
+      allow(User).to receive(:clear_group_with_mcp_server_enabled_cache) { |user_ids| cleared_user_ids << user_ids }
+
+      consume_event(subscriber: described_class, event: event)
+
+      expect(cleared_user_ids).to all(have_attributes(size: 1))
+      expect(cleared_user_ids.flatten).to match_array(
+        [group_member.user.id, sub_group_member.user.id, project_member.user.id]
+      )
+    end
+
+    it 'logs the number of batches and user IDs cleared' do
+      worker = described_class.new
+      expect(worker).to receive(:log_hash_metadata_on_done).with(user_id_batches: 3, user_ids_cleared: 3)
+
+      worker.handle_event(event)
+    end
+  end
+
+  context 'when batch_ai_namespace_access_cache_reset is disabled' do
+    before do
+      stub_feature_flags(batch_ai_namespace_access_cache_reset: false)
+    end
+
+    it 'clears MCP cache for all members in one call' do
+      expect(User).to receive(:clear_group_with_mcp_server_enabled_cache).once.with(
+        match_array([group_member.user.id, sub_group_member.user.id, project_member.user.id])
+      )
+
+      consume_event(subscriber: described_class, event: event)
+    end
+  end
+end

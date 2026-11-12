@@ -1,0 +1,62 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe 'projects/settings/operations/show' do
+  let_it_be(:project) { create(:project) }
+  let_it_be(:user) { create(:user, maintainer_of: project) }
+
+  let_it_be(:error_tracking_setting) do
+    create(:project_error_tracking_setting, project: project)
+  end
+
+  before do
+    assign :project, project
+
+    allow(view).to receive_messages(
+      error_tracking_setting: error_tracking_setting,
+      current_user: user
+    )
+  end
+
+  describe 'Operations > Alerts' do
+    it 'renders the Operations Settings page' do
+      render
+
+      expect(rendered).to have_content _('Alerts')
+      expect(rendered).to have_content _('Display alerts from all configured monitoring tools.')
+    end
+  end
+
+  describe 'Operations > Incidents' do
+    it 'renders the incident settings' do
+      render
+
+      expect(rendered).to have_css('.js-incidents-settings')
+    end
+
+    context 'when the user cannot update incident management settings' do
+      before do
+        allow(view).to receive(:can?).and_call_original
+        allow(view).to receive(:can?).with(user, :update_incident_management_setting, project).and_return(false)
+      end
+
+      it 'does not render the incident settings' do
+        render
+
+        expect(rendered).not_to have_css('.js-incidents-settings')
+      end
+    end
+  end
+
+  describe 'Operations > Error Tracking' do
+    describe 'Settings page' do
+      it 'renders the Operations Settings page' do
+        render
+
+        expect(rendered).to have_content _('Error tracking')
+        expect(rendered).to have_content _('Link Sentry to GitLab to discover and view the errors your application generates.')
+      end
+    end
+  end
+end

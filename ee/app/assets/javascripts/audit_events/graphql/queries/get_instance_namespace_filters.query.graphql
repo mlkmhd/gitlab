@@ -1,0 +1,17 @@
+# @feature_category: audit_events
+query getInstanceNamespaceFilters($search: String) {
+  groups(search: $search) {
+    nodes {
+      id
+      name
+      fullPath
+    }
+  }
+  projects(search: $search) {
+    nodes {
+      id
+      name
+      fullPath
+    }
+  }
+}

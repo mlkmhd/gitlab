@@ -1,0 +1,39 @@
+# @feature_category: security_policy_management
+#import "~/graphql_shared/fragments/page_info.fragment.graphql"
+
+query getSppLinkedGroupsProjects(
+  $fullPath: ID!
+  $search: String = ""
+  $after: String = ""
+  $projectIds: [ID!] = null
+  $groupsFirst: Int = 20
+  $projectsFirst: Int = 20
+) {
+  project(fullPath: $fullPath) {
+    id
+    securityPolicyProjectLinkedGroups(first: $groupsFirst, after: $after) {
+      nodes {
+        id
+        name
+        fullPath
+        projects(includeSubgroups: true, first: $projectsFirst, search: $search, ids: $projectIds) {
+          nodes {
+            id
+            name
+            fullPath
+            group {
+              id
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      pageInfo {
+        ...PageInfo
+      }
+    }
+  }
+}

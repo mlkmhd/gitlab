@@ -1,0 +1,24 @@
+# @feature_category: duo_agent_platform
+
+query workItemAgentPresence($fullPath: ID!, $iid: String!) {
+  namespace(fullPath: $fullPath) {
+    id
+    workItem(iid: $iid) {
+      id
+      agentPresence @gl_introduced(version: "19.6.0") {
+        sessionId
+        agentName
+        agentCatalogWebPath
+        triggerSource
+        user {
+          id
+          username
+          webPath
+        }
+        userPermissions {
+          readDuoWorkflow
+        }
+      }
+    }
+  }
+}

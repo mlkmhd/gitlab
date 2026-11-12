@@ -1,0 +1,14 @@
+# @feature_category: team_planning
+query getWorkItemNotificationsById($id: WorkItemID!) {
+  workItem(id: $id) {
+    id
+    iid
+
+    features {
+      notifications {
+        type
+        subscribed
+      }
+    }
+  }
+}

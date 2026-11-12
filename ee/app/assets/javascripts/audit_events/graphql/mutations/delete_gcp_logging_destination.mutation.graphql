@@ -1,0 +1,6 @@
+# @feature_category: audit_events
+mutation deleteGcpLoggingDestination($id: AuditEventsGoogleCloudLoggingConfigurationID!) {
+  googleCloudLoggingConfigurationDestroy(input: { id: $id }) {
+    errors
+  }
+}

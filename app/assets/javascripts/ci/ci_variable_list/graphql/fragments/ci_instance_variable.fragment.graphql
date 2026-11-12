@@ -1,0 +1,8 @@
+fragment BaseCiInstanceVariable on CiInstanceVariable {
+  id
+  description
+  hidden
+  masked
+  protected
+  raw
+}

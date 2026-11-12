@@ -1,0 +1,15 @@
+fragment ArtifactRegistryRepositoryVerdicts on ArtifactRegistryRepositoryPermissions {
+  readRepository
+  updateRepository
+  deleteRepository
+  createRepositoryUpstream
+  updateRepositoryUpstream
+  deleteRepositoryUpstream
+  readArtifact
+  createArtifact
+  deleteArtifact
+  readRoleAssignment @gl_introduced(version: "19.6.0")
+  createRoleAssignment @gl_introduced(version: "19.6.0")
+  updateRoleAssignment @gl_introduced(version: "19.6.0")
+  deleteRoleAssignment @gl_introduced(version: "19.6.0")
+}

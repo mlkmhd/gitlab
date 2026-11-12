@@ -1,0 +1,15 @@
+#import "./work_item_agent_plan.fragment.graphql"
+
+# @feature_category: team_planning
+subscription workItemAgentPlanUpdated($id: WorkItemID!, $includeReadinessScore: Boolean = false) {
+  workItemUpdated(workItemId: $id) {
+    id
+    iid
+
+    features {
+      agentPlan {
+        ...WorkItemAgentPlanFragment
+      }
+    }
+  }
+}

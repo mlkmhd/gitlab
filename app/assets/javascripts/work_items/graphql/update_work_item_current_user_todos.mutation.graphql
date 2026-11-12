@@ -1,0 +1,17 @@
+#import "./work_item_current_user_todos.fragment.graphql"
+
+# @feature_category: team_planning
+mutation workItemUpdateCurrentUserTodos($input: WorkItemUpdateInput!) {
+  workItemUpdate(input: $input) {
+    workItem {
+      id
+
+      features {
+        currentUserTodos {
+          ...WorkItemCurrentUserTodos
+        }
+      }
+    }
+    errors
+  }
+}

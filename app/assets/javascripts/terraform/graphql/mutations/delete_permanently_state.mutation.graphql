@@ -1,0 +1,6 @@
+# @feature_category: infrastructure_as_code
+mutation deletePermanentlyState($stateID: TerraformStateID!) {
+  terraformStateDeletePermanently(input: { id: $stateID }) {
+    errors
+  }
+}

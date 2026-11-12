@@ -1,0 +1,10 @@
+# @feature_category: audit_events
+mutation deleteGroupNamespaceFiltersFromDestination(
+  $namespaceFilterId: AuditEventsGroupNamespaceFilterID!
+) {
+  auditEventsGroupDestinationNamespaceFilterDelete(
+    input: { namespaceFilterId: $namespaceFilterId }
+  ) {
+    errors
+  }
+}

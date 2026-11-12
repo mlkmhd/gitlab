@@ -1,0 +1,26 @@
+#import "~/work_items/graphql/timelog.fragment.graphql"
+
+# @feature_category: team_planning
+mutation updateWorkItemTimeTracking($input: WorkItemUpdateInput!) {
+  workItemUpdate(input: $input) {
+    errors
+    workItem {
+      id
+
+      features {
+        timeTracking {
+          timeEstimate
+          humanReadableAttributes {
+            timeEstimate
+          }
+          timelogs {
+            nodes {
+              ...TimelogFragment
+            }
+          }
+          totalTimeSpent
+        }
+      }
+    }
+  }
+}

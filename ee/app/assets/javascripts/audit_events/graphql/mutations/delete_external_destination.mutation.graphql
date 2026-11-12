@@ -1,0 +1,6 @@
+# @feature_category: audit_events
+mutation deleteExternalDestination($id: AuditEventsExternalAuditEventDestinationID!) {
+  externalAuditEventDestinationDestroy(input: { id: $id }) {
+    errors
+  }
+}

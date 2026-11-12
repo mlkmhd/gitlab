@@ -1,0 +1,6 @@
+# @feature_category: vulnerability_management
+mutation securityAiFlowFeedbackCreate($input: SecurityAiFlowFeedbackCreateInput!) {
+  securityAiFlowFeedbackCreate(input: $input) {
+    errors
+  }
+}

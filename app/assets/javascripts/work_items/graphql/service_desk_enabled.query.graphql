@@ -1,0 +1,7 @@
+# @feature_category: team_planning
+query serviceDeskEnabled($fullPath: ID!) {
+  project(fullPath: $fullPath) {
+    id
+    serviceDeskEnabled
+  }
+}

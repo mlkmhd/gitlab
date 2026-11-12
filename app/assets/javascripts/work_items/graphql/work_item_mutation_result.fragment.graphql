@@ -1,0 +1,10 @@
+#import "ee_else_ce/work_items/graphql/work_item_base.fragment.graphql"
+#import "ee_else_ce/work_items/graphql/work_item_features.fragment.graphql"
+
+fragment WorkItemMutationResult on WorkItem {
+  ...WorkItemBase
+
+  features {
+    ...WorkItemFeatures
+  }
+}

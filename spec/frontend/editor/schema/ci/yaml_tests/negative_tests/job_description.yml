@@ -1,0 +1,8 @@
+# Job `description` is limited to 128 characters
+job_with_too_long_description:
+  script: echo
+  description: "This description is deliberately longer than the 128 character limit for the job description keyword, so the schema must reject it."
+
+job_with_non_string_description:
+  script: echo
+  description: 123

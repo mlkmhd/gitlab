@@ -1,0 +1,32 @@
+fragment AgentArtifactsAiGovernanceSessions on AiGovernanceSessionConnection {
+  nodes {
+    id
+    sessionId
+    source
+    flowType
+    agentType
+    webPath
+    downloadPath
+    sessionStartedAt
+    auditEventsCount
+    project {
+      id
+      name
+      webPath
+      fullPath
+    }
+    triggeredBy {
+      id
+      name
+      username
+      avatarUrl
+      webPath
+    }
+  }
+  pageInfo {
+    hasNextPage
+    hasPreviousPage
+    startCursor
+    endCursor
+  }
+}

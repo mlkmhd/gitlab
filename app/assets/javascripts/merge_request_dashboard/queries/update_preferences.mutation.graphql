@@ -1,0 +1,17 @@
+# @feature_category: code_review_workflow
+mutation updatePreferences(
+  $mergeRequestDashboardListType: MergeRequestsDashboardListType
+  $mergeRequestDashboardShowDrafts: Boolean
+) {
+  userPreferencesUpdate(
+    input: {
+      mergeRequestDashboardListType: $mergeRequestDashboardListType
+      mergeRequestDashboardShowDrafts: $mergeRequestDashboardShowDrafts
+    }
+  ) {
+    userPreferences {
+      mergeRequestDashboardListType: mergeRequestDashboardListType
+      mergeRequestDashboardShowDrafts
+    }
+  }
+}

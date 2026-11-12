@@ -1,0 +1,21 @@
+# @feature_category: code_review_workflow
+subscription currentUserMergeRequestUpdatedSubscription($userId: UserID!) {
+  userMergeRequestUpdated(userId: $userId) {
+    ... on MergeRequest {
+      id
+      author {
+        id
+      }
+      assignees {
+        nodes {
+          id
+        }
+      }
+      reviewers {
+        nodes {
+          id
+        }
+      }
+    }
+  }
+}

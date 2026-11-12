@@ -1,0 +1,11 @@
+# @feature_category: audit_events
+mutation deleteInstanceExternalDestinationFilters(
+  $destinationId: AuditEventsInstanceExternalAuditEventDestinationID!
+  $eventTypeFilters: [String!]!
+) {
+  auditEventsStreamingDestinationInstanceEventsRemove(
+    input: { destinationId: $destinationId, eventTypeFilters: $eventTypeFilters }
+  ) {
+    errors
+  }
+}

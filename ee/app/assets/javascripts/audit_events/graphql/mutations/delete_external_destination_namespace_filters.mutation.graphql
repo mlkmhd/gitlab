@@ -1,0 +1,8 @@
+# @feature_category: audit_events
+mutation deleteExternalDestinationNamespaceFilters(
+  $namespaceFilterId: AuditEventsStreamingHTTPNamespaceFilterID!
+) {
+  auditEventsStreamingHttpNamespaceFiltersDelete(input: { namespaceFilterId: $namespaceFilterId }) {
+    errors
+  }
+}

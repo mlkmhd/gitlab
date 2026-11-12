@@ -1,0 +1,10 @@
+# @feature_category: organization
+query getOrganizationAccessResourceMemberCounts($resourceId: String!) {
+  artifactRegistryRoleAssignmentCounts(resourceId: $resourceId) @client {
+    total
+    byRole {
+      role
+      count
+    }
+  }
+}

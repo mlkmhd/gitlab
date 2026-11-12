@@ -1,0 +1,38 @@
+# @feature_category: ai_agents
+#import "../fragments/agent_artifacts_ai_governance_sessions.fragment.graphql"
+
+query getAgentArtifactsAiGovernanceSessionsFiltered(
+  $after: String
+  $before: String
+  $first: Int
+  $last: Int
+  $flowType: String
+  $not: AiGovernanceSessionNegatedFilterInput
+  $startTimeAfter: Time
+  $startTimeBefore: Time
+  $projectPath: String
+  $triggeredByUserId: UserID
+  $agentType: String
+  $agentClass: AiGovernanceAgentClass
+  $groupFullPath: ID!
+) {
+  group(fullPath: $groupFullPath) {
+    id
+    aiGovernanceSessions(
+      after: $after
+      before: $before
+      first: $first
+      last: $last
+      sessionStartedAfter: $startTimeAfter
+      sessionStartedBefore: $startTimeBefore
+      projectPath: $projectPath
+      flowType: $flowType
+      triggeredByUserId: $triggeredByUserId
+      agentType: $agentType
+      agentClass: $agentClass
+      not: $not
+    ) {
+      ...AgentArtifactsAiGovernanceSessions
+    }
+  }
+}

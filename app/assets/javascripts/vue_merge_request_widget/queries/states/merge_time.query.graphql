@@ -1,0 +1,11 @@
+# @feature_category: code_review_workflow
+query mergeTime($projectPath: ID!, $iid: String!) {
+  project(fullPath: $projectPath) {
+    id
+    mergeRequest(iid: $iid) {
+      id
+      mergeAfter
+      mergeBefore @gl_introduced(version: "19.6.0")
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# @feature_category: audit_events
+query listInstanceAmazonS3Configuration {
+  auditEventsInstanceAmazonS3Configurations {
+    nodes {
+      id
+      name
+      accessKeyXid
+      awsRegion
+      bucketName
+      active
+    }
+  }
+}

@@ -1,0 +1,67 @@
+# @feature_category: ai_catalog_creation
+#import "../fragments/ai_catalog_item.fragment.graphql"
+#import "../fragments/ai_catalog_skill_version.fragment.graphql"
+
+query aiCatalogSkill(
+  $id: AiCatalogItemID!
+  $showSoftDeleted: Boolean
+  $projectId: ProjectID!
+  $hasProject: Boolean = false
+  $groupId: GroupID!
+  $hasGroup: Boolean = false
+) {
+  aiCatalogItem(id: $id, showSoftDeleted: $showSoftDeleted) {
+    ...BaseAiCatalogItem
+    isEnabledInManagedByProject
+    ... on AiCatalogSkill @gl_introduced(version: "19.5.0") {
+      path
+      directory
+      gitRef
+      blobSha
+      commitSha
+      authorName
+    }
+    project {
+      id
+      name
+      nameWithNamespace
+      fullPath
+      webPath
+      rootGroup {
+        id
+        fullName
+        fullPath
+      }
+      userPermissions {
+        createAiCatalogItemConsumer
+      }
+    }
+    latestVersion {
+      ...BaseAiCatalogSkillVersion
+    }
+    configurationForProject(projectId: $projectId) @include(if: $hasProject) {
+      id
+      enabled
+      pinnedItemVersion {
+        ...BaseAiCatalogSkillVersion
+      }
+      userPermissions {
+        adminAiCatalogItemConsumer
+      }
+    }
+    configurationForGroup(groupId: $groupId) @include(if: $hasGroup) {
+      id
+      enabled
+      group {
+        id
+        duoSettingsPath
+      }
+      pinnedItemVersion {
+        ...BaseAiCatalogSkillVersion
+      }
+      userPermissions {
+        adminAiCatalogItemConsumer
+      }
+    }
+  }
+}

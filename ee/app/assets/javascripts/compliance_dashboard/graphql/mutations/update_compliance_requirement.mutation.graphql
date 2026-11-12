@@ -1,0 +1,22 @@
+# @feature_category: compliance_management
+mutation updateComplianceRequirement($input: UpdateComplianceRequirementInput!) {
+  updateComplianceRequirement(input: $input) {
+    requirement {
+      id
+      name
+      description
+      complianceRequirementsControls {
+        nodes {
+          id
+          name
+          controlType
+          externalControlName
+          externalUrl
+          expression
+          pingEnabled
+        }
+      }
+    }
+    errors
+  }
+}

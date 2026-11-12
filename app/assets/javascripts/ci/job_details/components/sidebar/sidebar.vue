@@ -1,0 +1,122 @@
+<script>
+import { isEmpty } from 'lodash-es';
+// eslint-disable-next-line no-restricted-imports
+import { mapActions, mapGetters, mapState } from 'vuex';
+import { forwardDeploymentFailureModalId } from '~/ci/constants';
+import { filterAnnotations } from '~/ci/job_details/utils';
+import { convertObjectPropsToCamelCase } from '~/lib/utils/common_utils';
+import ArtifactsBlock from './artifacts_block.vue';
+import CommitBlock from './commit_block.vue';
+import ExternalLinksBlock from './external_links_block.vue';
+import JobsContainer from './jobs_container.vue';
+import JobRetryForwardDeploymentModal from './job_retry_forward_deployment_modal.vue';
+import JobSidebarDetailsContainer from './sidebar_job_details_container.vue';
+import StagesDropdown from './stages_dropdown.vue';
+import TriggerBlock from './trigger_block.vue';
+
+export default {
+  name: 'JobSidebar',
+  forwardDeploymentFailureModalId,
+  components: {
+    ArtifactsBlock,
+    CommitBlock,
+    JobsContainer,
+    JobRetryForwardDeploymentModal,
+    JobSidebarDetailsContainer,
+    StagesDropdown,
+    TriggerBlock,
+    ExternalLinksBlock,
+  },
+  props: {
+    artifactHelpUrl: {
+      type: String,
+      required: false,
+      default: '',
+    },
+  },
+  computed: {
+    ...mapGetters(['hasForwardDeploymentFailure']),
+    ...mapState(['job', 'stages', 'jobs', 'selectedStage']),
+    hasArtifact() {
+      // if available, the artifact object will always have a locked property
+      return this.job?.artifact && Object.keys(this.job.artifact).length > 1;
+    },
+    artifact() {
+      return convertObjectPropsToCamelCase(this.job.artifact, { deep: true });
+    },
+    hasExternalLinks() {
+      return this.externalLinks.length > 0;
+    },
+    hasTriggers() {
+      return !isEmpty(this.job.trigger);
+    },
+    commit() {
+      return this.job?.pipeline?.commit || {};
+    },
+    selectedStageData() {
+      return this.stages.find((val) => val.name === this.selectedStage);
+    },
+    selectedStageId() {
+      return this.selectedStageData?.id ?? null;
+    },
+    shouldShowJobRetryForwardDeploymentModal() {
+      return this.job.retry_path && this.hasForwardDeploymentFailure;
+    },
+    externalLinks() {
+      return filterAnnotations(this.job.annotations, 'external_link');
+    },
+    reports() {
+      return this.job?.reports || [];
+    },
+  },
+  methods: {
+    ...mapActions(['fetchJobsForStage']),
+  },
+};
+</script>
+<template>
+  <aside class="build-sidebar">
+    <job-sidebar-details-container />
+
+    <artifacts-block
+      v-if="hasArtifact"
+      class="build-sidebar-item"
+      :artifact="artifact"
+      :reports="reports"
+      :help-url="artifactHelpUrl"
+    />
+
+    <external-links-block
+      v-if="hasExternalLinks"
+      class="build-sidebar-item"
+      :external-links="externalLinks"
+    />
+
+    <trigger-block v-if="hasTriggers" class="build-sidebar-item" :trigger="job.trigger" />
+
+    <commit-block class="build-sidebar-item" :commit="commit" :merge-request="job.merge_request" />
+
+    <stages-dropdown
+      v-if="job.pipeline"
+      class="build-sidebar-item"
+      :pipeline="job.pipeline"
+      :selected-stage="selectedStage"
+      :stages="stages"
+      @request-sidebar-stage-dropdown="fetchJobsForStage"
+    />
+
+    <jobs-container
+      v-if="jobs.length"
+      :job-id="job.id"
+      :jobs="jobs"
+      :stage-id="selectedStageId"
+      @refetch-jobs="fetchJobsForStage(selectedStageData)"
+    />
+
+    <job-retry-forward-deployment-modal
+      v-if="shouldShowJobRetryForwardDeploymentModal"
+      :modal-id="$options.forwardDeploymentFailureModalId"
+      :href="job.retry_path"
+    />
+  </aside>
+</template>

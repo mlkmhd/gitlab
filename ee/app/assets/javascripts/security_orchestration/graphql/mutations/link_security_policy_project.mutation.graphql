@@ -1,0 +1,6 @@
+# @feature_category: security_policy_management
+mutation linkSecurityPolicyProject($input: SecurityPolicyProjectAssignInput!) {
+  securityPolicyProjectAssign(input: $input) {
+    errors
+  }
+}

@@ -1,0 +1,16 @@
+# @feature_category: duo_agent_platform
+#import "./duo_agent_session.fragment.graphql"
+
+query getDuoAgentSessionsOnMergeRequest($projectPath: ID!, $iid: String!) {
+  project(fullPath: $projectPath) {
+    id
+    mergeRequest(iid: $iid) {
+      id
+      duoWorkflows {
+        nodes {
+          ...DuoAgentSession
+        }
+      }
+    }
+  }
+}

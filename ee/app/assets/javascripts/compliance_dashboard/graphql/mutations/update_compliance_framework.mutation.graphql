@@ -1,0 +1,29 @@
+# @feature_category: compliance_management
+mutation updateComplianceFramework($input: UpdateComplianceFrameworkInput!) {
+  updateComplianceFramework(input: $input) {
+    clientMutationId
+    errors
+    complianceFramework {
+      id
+      name
+      description
+      color
+      pipelineConfigurationFullPath
+      projects {
+        nodes {
+          id
+          name
+          webUrl
+          visibility
+          description
+          namespace {
+            id
+            name
+            webUrl
+            fullName
+          }
+        }
+      }
+    }
+  }
+}

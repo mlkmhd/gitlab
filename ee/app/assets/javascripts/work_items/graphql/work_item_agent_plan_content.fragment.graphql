@@ -1,0 +1,7 @@
+# @feature_category: team_planning
+
+fragment WorkItemAgentPlanContentFragment on WorkItemWidgetAgentPlan {
+  type
+  content
+  contentHtml
+}

@@ -1,0 +1,16 @@
+# @feature_category: team_planning
+mutation workItemSubscribe($input: WorkItemSubscribeInput!) {
+  workItemSubscribe(input: $input) {
+    errors
+    workItem {
+      id
+
+      features {
+        notifications {
+          type
+          subscribed
+        }
+      }
+    }
+  }
+}

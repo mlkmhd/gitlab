@@ -1,0 +1,11 @@
+# @feature_category: security_policy_management
+query getNamespaceGroups($search: String) {
+  groups(search: $search) {
+    nodes {
+      avatarUrl
+      id
+      fullName
+      fullPath
+    }
+  }
+}

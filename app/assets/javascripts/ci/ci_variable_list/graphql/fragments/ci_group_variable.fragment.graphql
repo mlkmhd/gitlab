@@ -1,0 +1,9 @@
+fragment BaseCiGroupVariable on CiGroupVariable {
+  id
+  description
+  environmentScope
+  hidden
+  masked
+  protected
+  raw
+}

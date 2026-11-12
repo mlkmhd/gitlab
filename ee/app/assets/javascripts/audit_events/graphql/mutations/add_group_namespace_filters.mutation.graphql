@@ -1,0 +1,18 @@
+# @feature_category: audit_events
+mutation AddNamespaceFiltersToGroupDestination(
+  $destinationId: AuditEventsGroupExternalStreamingDestinationID!
+  $namespacePath: String
+) {
+  auditEventsGroupDestinationNamespaceFilterCreate(
+    input: { destinationId: $destinationId, namespacePath: $namespacePath }
+  ) {
+    errors
+    namespaceFilter {
+      id
+      namespace {
+        id
+        fullPath
+      }
+    }
+  }
+}

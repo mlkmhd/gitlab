@@ -1,0 +1,20 @@
+fragment DuoMessageFields on DuoMessage {
+  content
+  messageType
+  messageSubType
+  status
+  toolInfo
+  timestamp
+  correlationId
+  messageId
+  role
+  threadTs
+  parentTs
+  alternativeCount
+  additionalContext {
+    category
+    id
+    content
+    metadata
+  }
+}

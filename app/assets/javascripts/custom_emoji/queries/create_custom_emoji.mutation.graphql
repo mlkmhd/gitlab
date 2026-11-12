@@ -1,0 +1,6 @@
+# @feature_category: code_review_workflow
+mutation createCustomEmoji($groupPath: ID!, $name: String!, $url: String!) {
+  createCustomEmoji(input: { groupPath: $groupPath, name: $name, url: $url }) {
+    errors
+  }
+}

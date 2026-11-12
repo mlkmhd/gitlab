@@ -1,0 +1,503 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe JiraConnect::EventsController, :with_current_organization, feature_category: :integrations do
+  shared_examples 'verifies asymmetric JWT token' do
+    it 'verifies the token against the base URL from the payload' do
+      expect(Atlassian::JiraConnect::Jwt::Asymmetric).to receive(:new)
+        .with(anything, anything, base_url: params[:baseUrl])
+        .and_return(instance_double(Atlassian::JiraConnect::Jwt::Asymmetric, valid?: false))
+
+      send_request
+    end
+
+    context 'when token is valid' do
+      include_context 'valid JWT token'
+
+      it 'renders successful' do
+        send_request
+
+        expect(response).to have_gitlab_http_status(:success)
+      end
+    end
+
+    context 'when token is invalid' do
+      include_context 'invalid JWT token'
+
+      it 'renders unauthorized' do
+        send_request
+
+        expect(response).to have_gitlab_http_status(:unauthorized)
+      end
+
+      context 'when JWT token is nil' do
+        let(:jwt_token) { nil }
+
+        it 'renders unauthorized' do
+          send_request
+
+          expect(response).to have_gitlab_http_status(:unauthorized)
+        end
+      end
+
+      context 'when JWT token is empty' do
+        let(:jwt_token) { '' }
+
+        it 'renders unauthorized' do
+          send_request
+
+          expect(response).to have_gitlab_http_status(:unauthorized)
+        end
+      end
+
+      context 'when JWT token exceeds size limit' do
+        let(:jwt_token) { 'x' * 9.kilobytes }
+
+        it 'renders unauthorized' do
+          send_request
+
+          expect(response).to have_gitlab_http_status(:unauthorized)
+        end
+      end
+    end
+  end
+
+  shared_context 'valid JWT token' do
+    before do
+      allow_next_instance_of(Atlassian::JiraConnect::Jwt::Asymmetric) do |asymmetric_jwt|
+        allow(asymmetric_jwt).to receive_messages(valid?: true, iss_claim: client_key)
+      end
+    end
+  end
+
+  shared_context 'invalid JWT token' do
+    before do
+      allow_next_instance_of(Atlassian::JiraConnect::Jwt::Asymmetric) do |asymmetric_jwt|
+        allow(asymmetric_jwt).to receive(:valid?).and_return(false)
+      end
+    end
+  end
+
+  describe '#installed' do
+    let_it_be(:client_key) { '1234' }
+    let_it_be(:shared_secret) { 'secret' }
+    let_it_be(:base_url) { 'https://test.atlassian.net' }
+    let_it_be(:display_url) { 'https://custom.example.com' }
+    let(:jwt_token) { Atlassian::Jwt.encode({ iss: client_key, qsh: 'test' }, shared_secret) }
+
+    let(:params) do
+      {
+        clientKey: client_key,
+        sharedSecret: shared_secret,
+        baseUrl: base_url,
+        displayUrl: display_url,
+        jwt: jwt_token
+      }
+    end
+
+    include_context 'valid JWT token'
+
+    subject do
+      post :installed, params: params
+    end
+
+    it_behaves_like 'verifies asymmetric JWT token' do
+      let(:send_request) { subject }
+    end
+
+    context 'when the jira connect domain allowlist is configured' do
+      shared_examples 'rejects the request' do
+        it 'returns 422 and does not create an installation' do
+          expect { subject }.not_to change { JiraConnectInstallation.count }
+          expect(response).to have_gitlab_http_status(:unprocessable_entity)
+        end
+      end
+
+      context 'when the base_url domain matches an allowlisted domain' do
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['test.atlassian.net'])
+        end
+
+        it 'saves the jira installation data' do
+          expect { subject }.to change { JiraConnectInstallation.count }.by(1)
+          expect(response).to have_gitlab_http_status(:ok)
+        end
+      end
+
+      context 'when the base_url domain is not allowlisted' do
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['other.atlassian.net'])
+        end
+
+        it_behaves_like 'rejects the request'
+
+        it 'logs the rejected lifecycle event' do
+          allow(Gitlab::IntegrationsLogger).to receive(:info)
+
+          subject
+
+          expect(Gitlab::IntegrationsLogger).to have_received(:info).with(
+            hash_including(
+              jira_client_key: client_key,
+              jira_errors: ['Jira domain is not allowlisted'],
+              jira_event_action: :installed,
+              message: 'JiraConnect lifecycle event rejected'
+            )
+          )
+        end
+      end
+
+      context 'when an installation already exists and its host is not allowlisted' do
+        let!(:existing_installation) do
+          create(
+            :jira_connect_installation,
+            base_url: base_url,
+            client_key: client_key,
+            organization: current_organization,
+            shared_secret: 'old-secret'
+          )
+        end
+
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['other.atlassian.net'])
+        end
+
+        it 'returns 422 and leaves the installation unchanged' do
+          expect { subject }.not_to change { JiraConnectInstallation.count }
+          expect(response).to have_gitlab_http_status(:unprocessable_entity)
+          expect(existing_installation.reload.shared_secret).to eq('old-secret')
+        end
+      end
+
+      context 'when the allowlist contains only the parent domain' do
+        let(:base_url) { 'https://company.atlassian.net' }
+
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['atlassian.net'])
+        end
+
+        it_behaves_like 'rejects the request'
+      end
+
+      context 'when the base_url host case differs from the allowlisted domain' do
+        let(:base_url) { 'https://TEST.Atlassian.net' }
+
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['test.atlassian.net'])
+        end
+
+        it 'saves the jira installation data' do
+          expect { subject }.to change { JiraConnectInstallation.count }.by(1)
+          expect(response).to have_gitlab_http_status(:ok)
+        end
+      end
+
+      context 'when base_url is blank' do
+        let(:base_url) { '' }
+
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['test.atlassian.net'])
+        end
+
+        it_behaves_like 'rejects the request'
+      end
+
+      context 'when base_url is not a valid URI' do
+        let(:base_url) { 'not a url' }
+
+        before do
+          stub_application_setting(jira_connect_domain_allowlist: ['test.atlassian.net'])
+        end
+
+        it_behaves_like 'rejects the request'
+      end
+    end
+
+    it 'saves the jira installation data' do
+      expect { subject }.to change { JiraConnectInstallation.count }.by(1)
+    end
+
+    it 'saves the correct values' do
+      subject
+
+      installation = JiraConnectInstallation.find_by_client_key_and_organization_id(client_key, current_organization.id)
+
+      expect(installation.shared_secret).to eq(shared_secret)
+      expect(installation.base_url).to eq('https://test.atlassian.net')
+      expect(installation.organization_id).to eq(current_organization.id)
+      expect(installation.display_url).to eq('https://custom.example.com')
+    end
+
+    it 'persists the cloud_id from the lifecycle payload' do
+      post :installed, params: params.merge(cloudId: 'jira-cloud-id-xyz')
+
+      installation = JiraConnectInstallation.find_by_client_key_and_organization_id(client_key, current_organization.id)
+
+      expect(installation.cloud_id).to eq('jira-cloud-id-xyz')
+    end
+
+    context 'when the shared_secret param is missing' do
+      let(:jwt_token) { Atlassian::Jwt.encode({ iss: client_key, qsh: 'test' }, 'some_secret') }
+
+      let(:params) do
+        {
+          clientKey: client_key,
+          baseUrl: base_url,
+          displayUrl: display_url,
+          jwt: jwt_token
+        }
+      end
+
+      it 'returns 422 and logs the validation errors', :aggregate_failures do
+        expect(Gitlab::IntegrationsLogger).to receive(:info).with(
+          hash_including(
+            integration: 'JiraConnect',
+            message: 'JiraConnect lifecycle event rejected',
+            jira_event_action: :create,
+            jira_client_key: client_key,
+            jira_errors: array_including(/Shared secret/)
+          )
+        )
+
+        subject
+
+        expect(response).to have_gitlab_http_status(:unprocessable_entity)
+      end
+    end
+
+    context 'when an installation already exists' do
+      let_it_be(:installation) do
+        create(
+          :jira_connect_installation,
+          base_url: base_url,
+          client_key: client_key,
+          shared_secret: shared_secret,
+          display_url: display_url,
+          organization: current_organization
+        )
+      end
+
+      it 'validates the JWT token in authorization header and returns 200 without creating a new installation', :aggregate_failures do
+        expect { subject }.not_to change { JiraConnectInstallation.count }
+        expect(response).to have_gitlab_http_status(:ok)
+      end
+
+      it 'uses the JiraConnectInstallations::UpdateService' do
+        expect_next_instance_of(
+          JiraConnectInstallations::UpdateService, installation, nil, anything, skip_jira_admin_check: true
+        ) do |update_service|
+          expect(update_service).to receive(:execute).and_call_original
+        end
+
+        subject
+      end
+
+      it 'passes current organization id to UpdateService' do
+        expect(JiraConnectInstallations::UpdateService)
+          .to receive(:execute)
+          .with(
+            installation,
+            nil,
+            ActionController::Parameters
+              .new(shared_secret: shared_secret, organization_id: current_organization.id, base_url: base_url, display_url: display_url)
+              .permit(:shared_secret, :base_url, :organization_id, :display_url),
+            skip_jira_admin_check: true)
+          .and_call_original
+
+        subject
+      end
+
+      context 'when parameters include a new shared secret, base_url, and display_url' do
+        let(:shared_secret) { 'new_secret' }
+        let(:base_url) { 'https://new_test.atlassian.net' }
+        let(:display_url) { 'https://new_custom.example.com' }
+
+        it 'updates the installation', :aggregate_failures do
+          subject
+
+          expect(response).to have_gitlab_http_status(:ok)
+          expect(installation.reload).to have_attributes(
+            shared_secret: shared_secret,
+            base_url: base_url,
+            display_url: display_url
+          )
+        end
+      end
+
+      context 'when the new base_url is invalid' do
+        let(:base_url) { 'invalid' }
+
+        it 'renders 422 and logs the service error', :aggregate_failures do
+          expect(Gitlab::IntegrationsLogger).to receive(:info).with(
+            hash_including(
+              integration: 'JiraConnect',
+              message: 'JiraConnect lifecycle event rejected',
+              jira_event_action: :update,
+              jira_client_key: client_key,
+              jira_errors: array_including(/Base url/)
+            )
+          )
+
+          expect { subject }.not_to change { installation.reload.base_url }
+          expect(response).to have_gitlab_http_status(:unprocessable_entity)
+        end
+      end
+    end
+
+    shared_examples 'generates JWT validation claims' do
+      specify do
+        expect_next_instance_of(Atlassian::JiraConnect::Jwt::Asymmetric, anything, expected_claims, anything) do |asymmetric_jwt|
+          allow(asymmetric_jwt).to receive(:valid?).and_return(true)
+        end
+
+        subject
+      end
+    end
+
+    context 'when additional_audience_url is not configured' do
+      before do
+        allow(Gitlab::CurrentSettings).to receive(:jira_connect_additional_audience_url)
+          .and_return(nil)
+      end
+
+      context 'when enforce_jira_base_url_https is true' do
+        before do
+          allow(Gitlab.config.jira_connect).to receive(:enforce_jira_base_url_https).and_return(true)
+        end
+
+        let(:expected_claims) do
+          {
+            aud: ['https://test.host/-/jira_connect'],
+            iss: anything,
+            qsh: anything
+          }
+        end
+
+        it_behaves_like 'generates JWT validation claims'
+      end
+
+      context 'when enforce_jira_base_url_https is false' do
+        before do
+          allow(Gitlab.config.jira_connect).to receive(:enforce_jira_base_url_https).and_return(false)
+        end
+
+        let(:expected_claims) do
+          {
+            aud: ['http://test.host/-/jira_connect'],
+            iss: anything,
+            qsh: anything
+          }
+        end
+
+        it_behaves_like 'generates JWT validation claims'
+      end
+    end
+
+    context 'when additional_audience_url is configured' do
+      context 'when enforce_jira_base_url_https is true' do
+        before do
+          allow(Gitlab::CurrentSettings).to receive(:jira_connect_additional_audience_url).and_return('https://proxy.host')
+          allow(Gitlab.config.jira_connect).to receive(:enforce_jira_base_url_https).and_return(true)
+        end
+
+        let(:expected_claims) do
+          {
+            aud: [
+              'https://test.host/-/jira_connect',
+              'https://proxy.host/-/jira_connect'
+            ],
+            iss: anything,
+            qsh: anything
+          }
+        end
+
+        it_behaves_like 'generates JWT validation claims'
+      end
+
+      context 'when enforce_jira_base_url_https is false' do
+        before do
+          allow(Gitlab::CurrentSettings).to receive(:jira_connect_additional_audience_url).and_return('https://proxy.host')
+          allow(Gitlab.config.jira_connect).to receive(:enforce_jira_base_url_https).and_return(false)
+        end
+
+        let(:expected_claims) do
+          {
+            aud: [
+              'http://test.host/-/jira_connect',
+              'https://proxy.host/-/jira_connect'
+            ],
+            iss: anything,
+            qsh: anything
+          }
+        end
+
+        it_behaves_like 'generates JWT validation claims'
+      end
+    end
+  end
+
+  describe '#uninstalled' do
+    let_it_be(:installation) { create(:jira_connect_installation, organization: current_organization) }
+
+    let(:client_key) { installation.client_key }
+    let(:jwt_token) { Atlassian::Jwt.encode({ iss: client_key, qsh: 'test' }, installation.shared_secret) }
+    let(:params) do
+      {
+        clientKey: client_key,
+        baseUrl: 'https://test.atlassian.net',
+        jwt: jwt_token
+      }
+    end
+
+    it_behaves_like 'verifies asymmetric JWT token' do
+      let(:send_request) { post :uninstalled, params: params }
+    end
+
+    subject(:post_uninstalled) { post :uninstalled, params: params }
+
+    context 'when JWT is invalid' do
+      include_context 'invalid JWT token'
+
+      it 'does not delete the installation' do
+        expect { post_uninstalled }.not_to change { JiraConnectInstallation.count }
+      end
+    end
+
+    context 'when JWT is valid' do
+      include_context 'valid JWT token'
+
+      let(:jira_base_path) { '/-/jira_connect' }
+      let(:jira_event_path) { '/-/jira_connect/events/uninstalled' }
+
+      it 'calls the DestroyService and returns ok in case of success' do
+        expect_next_instance_of(JiraConnectInstallations::DestroyService, installation, jira_base_path, jira_event_path) do |destroy_service|
+          expect(destroy_service).to receive(:execute).and_return(true)
+        end
+
+        post_uninstalled
+
+        expect(response).to have_gitlab_http_status(:ok)
+      end
+
+      it 'calls the DestroyService and returns unprocessable_entity in case of failure' do
+        expect_next_instance_of(JiraConnectInstallations::DestroyService, installation, jira_base_path, jira_event_path) do |destroy_service|
+          expect(destroy_service).to receive(:execute).and_return(false)
+        end
+
+        expect(Gitlab::IntegrationsLogger).to receive(:info).with(
+          hash_including(
+            integration: 'JiraConnect',
+            message: 'JiraConnect lifecycle event rejected',
+            jira_event_action: :uninstall,
+            jira_client_key: client_key
+          )
+        )
+
+        post_uninstalled
+
+        expect(response).to have_gitlab_http_status(:unprocessable_entity)
+      end
+    end
+  end
+end

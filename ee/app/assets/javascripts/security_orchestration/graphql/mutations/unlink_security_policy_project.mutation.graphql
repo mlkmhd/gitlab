@@ -1,0 +1,6 @@
+# @feature_category: security_policy_management
+mutation securityPolicyProjectUnassign($input: SecurityPolicyProjectUnassignInput!) {
+  securityPolicyProjectUnassign(input: $input) {
+    errors
+  }
+}

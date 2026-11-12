@@ -1,0 +1,66 @@
+<script>
+import { GlLink, GlIcon, GlBadge } from '@gitlab/ui';
+import glFeatureFlagMixin from '~/vue_shared/mixins/gl_feature_flags_mixin';
+import glLicensedFeaturesMixin from '~/vue_shared/mixins/gl_licensed_features_mixin';
+
+export default {
+  name: 'AgentIntegrationStatusRow',
+  components: {
+    GlLink,
+    GlIcon,
+    GlBadge,
+  },
+  mixins: [glLicensedFeaturesMixin(), glFeatureFlagMixin()],
+  props: {
+    text: {
+      required: true,
+      type: String,
+    },
+    icon: {
+      required: false,
+      type: String,
+      default: 'information',
+    },
+    iconClass: {
+      required: false,
+      type: String,
+      default: '!gl-fill-icon-info',
+    },
+    helpUrl: {
+      required: false,
+      type: String,
+      default: null,
+    },
+    featureName: {
+      required: false,
+      type: String,
+      default: null,
+    },
+  },
+  computed: {
+    isFeature() {
+      return this.glFeatures[this.featureName] || this.glLicensedFeatures[this.featureName];
+    },
+    showPremiumBadge() {
+      return this.featureName && !this.isFeature;
+    },
+  },
+};
+</script>
+
+<template>
+  <li class="gl-mb-3">
+    <gl-icon :name="icon" :size="16" :class="iconClass" class="gl-mr-2" />
+
+    <gl-link v-if="helpUrl" :href="helpUrl">{{ text }}</gl-link>
+    <span v-else>{{ text }}</span>
+
+    <gl-badge
+      v-if="showPremiumBadge"
+      class="gl-ml-2 gl-align-middle"
+      icon="license"
+      variant="tier"
+      >{{ s__('ClusterAgents|Premium') }}</gl-badge
+    >
+  </li>
+</template>

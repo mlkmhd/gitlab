@@ -1,0 +1,39 @@
+#import "~/graphql_shared/fragments/page_info.fragment.graphql"
+
+# @feature_category: team_planning
+query workItemVulnerabilities(
+  $fullPath: ID!
+  $iid: String!
+  $first: Int = 25
+  $after: String = ""
+) {
+  namespace(fullPath: $fullPath) {
+    id
+    workItem(iid: $iid) {
+      id
+      iid
+      namespace {
+        id
+      }
+
+      features {
+        vulnerabilities {
+          type
+          relatedVulnerabilities(first: $first, after: $after) {
+            nodes {
+              id
+              state
+              severity
+              name
+              webUrl
+            }
+            pageInfo {
+              ...PageInfo
+            }
+            count
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+# @feature_category: compliance_management
+query failedRequirements($groupPath: ID!) {
+  group(fullPath: $groupPath) {
+    id
+    complianceRequirementCoverage {
+      failed
+      passed
+      pending
+      notApplicable @gl_introduced(version: "19.6.0")
+    }
+  }
+}

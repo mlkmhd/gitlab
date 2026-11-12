@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe CloudConnector::StatusChecks::Probes::SelfHosted::AiGatewayUrlPresenceProbe, feature_category: :duo_service_infra do
+  let(:probe) { described_class.new }
+  let(:url) { 'https://ai-gateway.example.com' }
+
+  describe '#execute' do
+    context 'when ai_gateway_url is set' do
+      before do
+        stub_application_setting(ai_gateway_url: url)
+      end
+
+      it 'returns a successful result' do
+        result = probe.execute
+        expect(result).to be_a(CloudConnector::StatusChecks::Probes::ProbeResult)
+        expect(result.success?).to be(true)
+        expect(result.message)
+          .to eq("Local AI Gateway URL is set to #{url}. It can be changed in the GitLab Duo configuration.")
+      end
+    end
+
+    context 'when ai_gateway_url is not set' do
+      before do
+        stub_application_setting(ai_gateway_url: nil)
+      end
+
+      it 'returns a failed result' do
+        result = probe.execute
+        expect(result).to be_a(CloudConnector::StatusChecks::Probes::ProbeResult)
+        expect(result.success?).to be(false)
+        expect(result.message).to eq('Local AI Gateway URL is not set. Set it in the GitLab Duo configuration.')
+      end
+    end
+  end
+end

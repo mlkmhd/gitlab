@@ -1,0 +1,101 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe 'projects/merge_requests/_page.html.haml', feature_category: :code_review_workflow do
+  let_it_be(:user) { build_stubbed(:user) }
+  let_it_be(:project) { build_stubbed(:project) }
+  let_it_be(:merge_request) do
+    build_stubbed(:merge_request, source_project: project, target_project: project)
+  end
+
+  let_it_be(:issuable_sidebar) do
+    MergeRequestSerializer
+      .new(current_user: user, project: project)
+      .represent(merge_request, serializer: 'sidebar')
+  end
+
+  before do
+    assign(:issuable_sidebar, issuable_sidebar)
+    assign(:project, project)
+    assign(:merge_request, merge_request)
+    assign(:noteable, merge_request)
+
+    allow(view).to receive(:rapid_diffs_presenter)
+    allow_next_instance_of(RapidDiffs::MergeRequestAppComponent) do |component|
+      allow(component).to receive(:render_in).and_return('')
+    end
+    allow(view).to receive(:sticky_header_data)
+
+    stub_template 'projects/merge_requests/_mr_title.html.haml' => ''
+    stub_template 'projects/merge_requests/_mr_box.html.haml' => ''
+  end
+
+  describe '#js-vue-mr-discussions' do
+    it 'renders' do
+      render
+
+      expect(rendered).to have_selector('#js-vue-mr-discussions')
+    end
+
+    [true, false].each do |archived_status|
+      context "when archived is #{archived_status}" do
+        before do
+          allow(project).to receive(:self_or_ancestors_archived?).and_return(archived_status)
+
+          render
+        end
+
+        specify { expect(rendered).to have_selector("#js-vue-mr-discussions[data-archived=\"#{archived_status}\"]") }
+      end
+    end
+  end
+
+  describe 'description position' do
+    before do
+      allow(merge_request).to receive(:description).and_return('Description')
+      stub_template 'projects/merge_requests/_description.html.haml' => ''
+    end
+
+    it 'renders the description after the widget' do
+      render
+
+      expect(rendered).to have_selector('#js-vue-mr-widget ~ .detail-page-description.gl-border.gl-rounded-lg')
+    end
+
+    it 'renders a skeleton inside the widget mount point' do
+      render
+
+      expect(rendered).to have_selector('#js-vue-mr-widget [aria-hidden="true"] .gl-animate-skeleton-loader')
+    end
+
+    context 'when mr_description_after_widget is disabled' do
+      before do
+        stub_feature_flags(mr_description_after_widget: false)
+      end
+
+      it 'renders the description before the widget' do
+        render
+
+        expect(rendered).to have_selector('.detail-page-description.gl-pb-0:not(.gl-border) ~ #js-vue-mr-widget')
+        expect(rendered).not_to have_selector('#js-vue-mr-widget .gl-animate-skeleton-loader')
+      end
+    end
+  end
+
+  describe '.js-changes-tab-count' do
+    [true, false].each do |initial_preparation|
+      context "when initial_preparation? is #{initial_preparation}" do
+        before do
+          allow(merge_request).to receive(:initial_preparation?).and_return(initial_preparation)
+
+          render
+        end
+
+        it 'exposes it as data-preparing' do
+          expect(rendered).to have_selector(".js-changes-tab-count[data-preparing=\"#{initial_preparation}\"]")
+        end
+      end
+    end
+  end
+end

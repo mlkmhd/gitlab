@@ -1,0 +1,10 @@
+#import "ee_else_ce/work_items/graphql/work_item.fragment.graphql"
+
+# @feature_category: team_planning
+mutation localUpdateWorkItem($input: LocalUpdateWorkItemInput) {
+  localUpdateWorkItem(input: $input) @client {
+    workItem {
+      ...WorkItem
+    }
+  }
+}

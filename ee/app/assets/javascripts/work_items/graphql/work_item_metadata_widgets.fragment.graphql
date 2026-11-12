@@ -1,0 +1,8 @@
+fragment WorkItemMetadataWidgets on WorkItemWidget {
+  type
+
+  ... on WorkItemWidgetLinkedItems {
+    blockedByCount
+    blockingCount
+  }
+}

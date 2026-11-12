@@ -1,0 +1,123 @@
+import { defineStore } from 'pinia';
+import { watch } from 'vue';
+import { parseBoolean } from '@gitlab/frontend-utils';
+import AccessorUtilities from '~/lib/utils/accessor';
+import { logError } from '~/lib/logger';
+import { useMainContainer } from '~/pinia/global_stores/main_container';
+import { FILE_TREE_BROWSER_VISIBILITY } from '../constants';
+
+export const useFileTreeBrowserVisibility = defineStore('fileTreeVisibility', {
+  state: () => ({
+    fileTreeBrowserIsExpanded: false,
+    fileTreeBrowserIsPeekOn: false,
+    shouldRestoreFocusToToggle: false,
+    expandedBeforeBlame: null,
+  }),
+  getters: {
+    fileTreeBrowserIsVisible: (state) =>
+      state.fileTreeBrowserIsExpanded || state.fileTreeBrowserIsPeekOn,
+  },
+  actions: {
+    setFileTreeBrowserIsExpanded(value) {
+      this.fileTreeBrowserIsExpanded = value;
+      if (!AccessorUtilities.canUseLocalStorage()) return;
+      try {
+        localStorage.setItem(FILE_TREE_BROWSER_VISIBILITY, JSON.stringify(value));
+      } catch (error) {
+        logError(error);
+      }
+    },
+    toggleFileTreeBrowserIsExpanded() {
+      this.expandedBeforeBlame = null;
+      this.setFileTreeBrowserIsExpanded(!this.fileTreeBrowserIsExpanded);
+    },
+    setFileTreeBrowserIsPeekOn(value) {
+      this.fileTreeBrowserIsPeekOn = value;
+    },
+    toggleFileTreeBrowserIsPeek() {
+      this.setFileTreeBrowserIsPeekOn(!this.fileTreeBrowserIsPeekOn);
+    },
+    resetFileTreeBrowserAllStates() {
+      this.fileTreeBrowserIsExpanded = false;
+      this.fileTreeBrowserIsPeekOn = false;
+    },
+    collapseForBlame() {
+      if (this.expandedBeforeBlame === null) {
+        this.expandedBeforeBlame = this.fileTreeBrowserIsExpanded;
+      }
+      this.fileTreeBrowserIsExpanded = false;
+      this.fileTreeBrowserIsPeekOn = false;
+    },
+    restoreAfterBlame() {
+      if (this.expandedBeforeBlame === null) return;
+      this.fileTreeBrowserIsExpanded = this.expandedBeforeBlame && !useMainContainer().isCompact;
+      this.expandedBeforeBlame = null;
+    },
+    applyStoredExpandedState(value) {
+      // Blame collapsed the tree before the preference loaded, so restore to it later
+      if (this.expandedBeforeBlame !== null) {
+        this.expandedBeforeBlame = value;
+        return;
+      }
+      this.setFileTreeBrowserIsExpanded(value);
+    },
+    loadFileTreeBrowserExpandedFromLocalStorage() {
+      if (!AccessorUtilities.canUseLocalStorage()) {
+        // Treat as first-time user when localStorage is unavailable
+        this.applyStoredExpandedState(true);
+        return;
+      }
+      try {
+        const storedValue = localStorage.getItem(FILE_TREE_BROWSER_VISIBILITY);
+        if (storedValue !== null) {
+          // User has interacted with the browser before, use their preference
+          this.applyStoredExpandedState(parseBoolean(storedValue));
+        } else {
+          // First-time user, show the file tree browser by default
+          this.applyStoredExpandedState(true);
+        }
+      } catch (error) {
+        logError(error);
+      }
+    },
+    handleFileTreeBrowserToggleClick() {
+      // Mark that focus should be restored after toggle
+      this.shouldRestoreFocusToToggle = true;
+
+      if (useMainContainer().isCompact) {
+        this.toggleFileTreeBrowserIsPeek();
+      } else {
+        this.toggleFileTreeBrowserIsExpanded();
+      }
+    },
+    clearRestoreFocusFlag() {
+      this.shouldRestoreFocusToToggle = false;
+    },
+    initializeFileTreeBrowser() {
+      // Only load expanded state on intermediate and wide screens
+      if (!useMainContainer().isCompact) {
+        this.loadFileTreeBrowserExpandedFromLocalStorage();
+      }
+      this.setupMainContainerWatcher();
+    },
+    setupMainContainerWatcher() {
+      const mainContainer = useMainContainer();
+
+      watch(
+        () => ({
+          isCompact: mainContainer.isCompact,
+        }),
+        ({ isCompact }, oldValue) => {
+          if (!oldValue) return;
+
+          const isVisible = this.fileTreeBrowserIsExpanded || this.fileTreeBrowserIsPeekOn;
+
+          if (isVisible) {
+            this.fileTreeBrowserIsPeekOn = isCompact;
+            this.fileTreeBrowserIsExpanded = !isCompact;
+          }
+        },
+      );
+    },
+  },
+});

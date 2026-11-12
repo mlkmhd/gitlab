@@ -1,0 +1,6 @@
+# @feature_category: security_policy_management
+mutation createPolicyProjectAsync($fullPath: String!) {
+  securityPolicyProjectCreateAsync(input: { fullPath: $fullPath }) {
+    errors
+  }
+}

@@ -1,0 +1,10 @@
+---
+name: duo_workflow_enforce_checkpoint_write_limits
+description: Rejects checkpoint write batches with more than 10 writes, any write over 1 KB, or a finished, stopped or failed session, instead of only logging them
+feature_issue_url: https://gitlab.com/gitlab-org/gitlab/-/work_items/635569
+introduced_by_url: https://gitlab.com/gitlab-org/gitlab/-/merge_requests/269253
+rollout_issue_url: https://gitlab.com/gitlab-org/gitlab/-/work_items/639148
+milestone: '19.6'
+group: group::agent execution
+type: gitlab_com_derisk
+default_enabled: false

@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "required": [
+    "worker_class",
+    "class_limit",
+    "effective_limit",
+    "adaptive_limit",
+    "default_limit_requires_shard_context",
+    "middleware_enabled",
+    "disabled_for_worker",
+    "override_limit",
+    "override_ttl",
+    "running_jobs",
+    "deferred_jobs"
+  ],
+  "properties": {
+    "worker_class": { "type": "string" },
+    "class_limit": { "type": ["integer", "null"] },
+    "effective_limit": { "type": ["integer", "null"] },
+    "adaptive_limit": { "type": ["integer", "null"] },
+    "default_limit_requires_shard_context": { "type": "boolean" },
+    "middleware_enabled": { "type": "boolean" },
+    "disabled_for_worker": { "type": "boolean" },
+    "override_limit": { "type": ["integer", "null"] },
+    "override_ttl": { "type": ["integer", "null"] },
+    "running_jobs": { "type": "integer" },
+    "deferred_jobs": { "type": "integer" }
+  },
+  "additionalProperties": false
+}

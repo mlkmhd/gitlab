@@ -1,0 +1,16 @@
+# @feature_category: team_planning
+
+# Kept separate from workItemAgentPlan so opening the readiness drawer does not change that
+# query's variables. Changing them makes vue-apollo rebuild the polled query and its subscription.
+query workItemAgentPlanReadinessFeedback($id: WorkItemID!) {
+  workItem(id: $id) {
+    id
+
+    features {
+      agentPlan {
+        type
+        readinessScoreFeedbackHtml
+      }
+    }
+  }
+}

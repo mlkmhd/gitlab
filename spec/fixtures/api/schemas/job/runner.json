@@ -1,0 +1,18 @@
+{
+  "oneOf": [
+    { "type": "null" },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "description"
+      ],
+      "properties": {
+        "id": { "type": "integer" },
+        "description": { "type": "string" },
+        "uuid": { "type": "string" },
+        "edit_path": { "type": "string" }
+      }
+    }
+  ]
+}

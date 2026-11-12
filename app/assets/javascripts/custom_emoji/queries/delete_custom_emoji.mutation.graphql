@@ -1,0 +1,8 @@
+# @feature_category: code_review_workflow
+mutation deleteCustomEmoji($id: CustomEmojiID!) {
+  destroyCustomEmoji(input: { id: $id }) {
+    customEmoji {
+      id
+    }
+  }
+}

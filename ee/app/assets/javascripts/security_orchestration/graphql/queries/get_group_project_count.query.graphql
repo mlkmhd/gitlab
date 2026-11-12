@@ -1,0 +1,9 @@
+# @feature_category: security_policy_management
+query getGroupProjectsCount($fullPath: ID!) {
+  group(fullPath: $fullPath) {
+    id
+    projects(includeSubgroups: true) {
+      count
+    }
+  }
+}

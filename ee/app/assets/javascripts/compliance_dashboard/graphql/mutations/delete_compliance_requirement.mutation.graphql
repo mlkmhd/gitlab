@@ -1,0 +1,6 @@
+# @feature_category: compliance_management
+mutation deleteComplianceRequirement($input: DestroyComplianceRequirementInput!) {
+  destroyComplianceRequirement(input: $input) {
+    errors
+  }
+}

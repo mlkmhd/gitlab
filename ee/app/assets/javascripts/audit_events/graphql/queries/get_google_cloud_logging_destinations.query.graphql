@@ -1,0 +1,16 @@
+# @feature_category: audit_events
+query getGoogleCloudLoggingDestinations($fullPath: ID!) {
+  group(fullPath: $fullPath) {
+    id
+    googleCloudLoggingConfigurations {
+      nodes {
+        id
+        name
+        logIdName
+        googleProjectIdName
+        clientEmail
+        active
+      }
+    }
+  }
+}

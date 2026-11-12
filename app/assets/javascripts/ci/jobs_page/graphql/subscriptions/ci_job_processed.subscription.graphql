@@ -1,0 +1,7 @@
+#import "../fragments/job_list_item.fragment.graphql"
+
+subscription jobProcessed($projectId: ProjectID!) {
+  ciJobProcessed(projectId: $projectId) {
+    ...JobListItem
+  }
+}

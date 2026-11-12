@@ -1,0 +1,8 @@
+# @feature_category: audit_events
+mutation deleteInstanceExternalDestination(
+  $id: AuditEventsInstanceExternalAuditEventDestinationID!
+) {
+  instanceExternalAuditEventDestinationDestroy(input: { id: $id }) {
+    errors
+  }
+}

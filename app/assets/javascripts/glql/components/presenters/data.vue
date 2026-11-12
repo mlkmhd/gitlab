@@ -1,0 +1,304 @@
+<script>
+import { __, sprintf } from '~/locale';
+import { DISPLAY_TYPES } from '../../constants';
+import AreaChartPresenter from './area_chart.vue';
+import BarChartPresenter from './bar_chart.vue';
+import BarListPresenter from './bar_list.vue';
+import ColumnChartPresenter from './column_chart.vue';
+import DivergingBarChartPresenter from './diverging_bar_chart.vue';
+import ExpandableTablePresenter from './expandable_table.vue';
+import HeatMapPresenter from './heat_map.vue';
+import LineChartPresenter from './line_chart.vue';
+import ListPresenter from './list.vue';
+import StatPresenter from './stat.vue';
+import TablePresenter from './table.vue';
+import { withBreakdown } from './utils/expandable_table';
+import { withTrendColumn } from './utils/table';
+
+const SUPPORTED_DISPLAY_TYPES = Object.values(DISPLAY_TYPES);
+
+export default {
+  name: 'DataPresenter',
+  components: {
+    TablePresenter,
+    ExpandableTablePresenter,
+    ListPresenter,
+    StatPresenter,
+    ColumnChartPresenter,
+    LineChartPresenter,
+    BarChartPresenter,
+    BarListPresenter,
+    AreaChartPresenter,
+    HeatMapPresenter,
+    DivergingBarChartPresenter,
+  },
+  props: {
+    displayType: {
+      required: true,
+      type: String,
+    },
+    data: {
+      required: false,
+      type: Object,
+      default: () => ({ nodes: [] }),
+    },
+    /**
+     * Result of a second query to compare `data` against.
+     */
+    comparisonData: {
+      required: false,
+      type: Object,
+      default: null,
+    },
+    /**
+     * True while the comparison query is still running, so the table can reserve
+     * room for the trend instead of adding it late.
+     */
+    comparisonPending: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * Metric the pending comparison will describe, known before its result is.
+     */
+    comparisonMetric: {
+      required: false,
+      type: String,
+      default: null,
+    },
+    /**
+     * True when a breakdown can be requested, so a table's rows can expand to show its rows.
+     */
+    hasBreakdown: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * Result of a second query that breaks `data` down by one more dimension, with the fields it
+     * compiled to.
+     */
+    breakdownData: {
+      required: false,
+      type: Object,
+      default: null,
+    },
+    breakdownLoading: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    breakdownError: {
+      required: false,
+      type: Error,
+      default: null,
+    },
+    fields: {
+      required: false,
+      type: Array,
+      default: () => [],
+    },
+    loading: {
+      required: false,
+      type: [Boolean, Number],
+      default: false,
+    },
+    displayConfig: {
+      required: false,
+      type: Object,
+      default: () => ({}),
+    },
+    source: {
+      required: false,
+      type: String,
+      default: '',
+    },
+    /**
+     * How many first-dimension values each page shows, from the block's `limit`. Null shows all.
+     */
+    displayPageSize: {
+      required: false,
+      type: Number,
+      default: null,
+    },
+  },
+  emits: { error: null, 'load-breakdown': null },
+  computed: {
+    isList() {
+      return (
+        this.displayType === DISPLAY_TYPES.LIST || this.displayType === DISPLAY_TYPES.ORDERED_LIST
+      );
+    },
+    listType() {
+      return this.displayType === DISPLAY_TYPES.LIST ? 'ul' : 'ol';
+    },
+    // The table's input, with the previous period joined in as a trend column.
+    table() {
+      if (this.displayType !== DISPLAY_TYPES.TABLE) return null;
+
+      return withTrendColumn({
+        fields: this.fields,
+        data: this.data,
+        comparisonData: this.comparisonData,
+        comparisonPending: this.comparisonPending,
+        comparisonMetric: this.comparisonMetric,
+        source: this.source,
+      });
+    },
+    // The table's rows with the breakdown's nested under them.
+    expandableTable() {
+      if (!this.table || !this.hasBreakdown) return null;
+
+      return withBreakdown({
+        fields: this.table.fields,
+        data: this.table.data,
+        breakdownData: this.breakdownData,
+      });
+    },
+    trendError() {
+      return this.table?.error ?? null;
+    },
+    breakdownJoinError() {
+      return this.expandableTable?.error ?? null;
+    },
+    unsupportedDisplayTypeError() {
+      if (SUPPORTED_DISPLAY_TYPES.includes(this.displayType)) return null;
+
+      return sprintf(
+        __(
+          'Unknown display type: `%{displayType}`. Supported display types are: %{supportedDisplayTypes}.',
+        ),
+        {
+          displayType: this.displayType,
+          supportedDisplayTypes: SUPPORTED_DISPLAY_TYPES.map((type) => `\`${type}\``).join(', '),
+        },
+      );
+    },
+  },
+  watch: {
+    unsupportedDisplayTypeError: {
+      immediate: true,
+      handler(message) {
+        if (message) this.$emit('error', new Error(message));
+      },
+    },
+    trendError: {
+      immediate: true,
+      handler(message) {
+        if (message) this.$emit('error', new Error(message));
+      },
+    },
+    breakdownJoinError: {
+      immediate: true,
+      handler(message) {
+        if (message) this.$emit('error', new Error(message));
+      },
+    },
+  },
+  DISPLAY_TYPES,
+};
+</script>
+<template>
+  <expandable-table-presenter
+    v-if="expandableTable"
+    :data="expandableTable.data"
+    :fields="table.fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :source="source"
+    :child-dimension="expandableTable.dimension"
+    :children-loading="breakdownLoading"
+    :children-error="Boolean(breakdownError)"
+    :truncated-child-count="expandableTable.truncatedCount"
+    @error="$emit('error', $event)"
+    @load-children="$emit('load-breakdown')"
+  />
+  <table-presenter
+    v-else-if="table"
+    :data="table.data"
+    :fields="table.fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :source="source"
+    @error="$emit('error', $event)"
+  />
+  <list-presenter
+    v-else-if="isList"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :list-type="listType"
+  />
+  <stat-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.STAT"
+    :data="data"
+    :comparison-data="comparisonData"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :source="source"
+    @error="$emit('error', $event)"
+  />
+  <column-chart-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.COLUMN_CHART"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :page-size="displayPageSize"
+    @error="$emit('error', $event)"
+  />
+  <line-chart-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.LINE_CHART"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :page-size="displayPageSize"
+    @error="$emit('error', $event)"
+  />
+  <bar-chart-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.BAR_CHART"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :page-size="displayPageSize"
+    @error="$emit('error', $event)"
+  />
+  <bar-list-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.BAR_LIST"
+    :data="data"
+    :comparison-data="comparisonData"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :source="source"
+    @error="$emit('error', $event)"
+  />
+  <area-chart-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.AREA_CHART"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    :page-size="displayPageSize"
+    @error="$emit('error', $event)"
+  />
+  <heat-map-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.HEAT_MAP"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :display-config="displayConfig"
+    @error="$emit('error', $event)"
+  />
+  <diverging-bar-chart-presenter
+    v-else-if="displayType === $options.DISPLAY_TYPES.DIVERGING_BAR_CHART"
+    :data="data"
+    :fields="fields"
+    :loading="loading"
+    :page-size="displayPageSize"
+    @error="$emit('error', $event)"
+  />
+</template>

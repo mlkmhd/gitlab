@@ -1,0 +1,15 @@
+# @feature_category: audit_events
+#import "../fragments/external_audit_event_destination.fragment.graphql"
+
+mutation updateExternalAuditEventDestination(
+  $id: AuditEventsExternalAuditEventDestinationID!
+  $name: String!
+  $active: Boolean = true
+) {
+  externalAuditEventDestinationUpdate(input: { id: $id, name: $name, active: $active }) {
+    errors
+    externalAuditEventDestination {
+      ...ExternalAuditEventDestinationFragment
+    }
+  }
+}

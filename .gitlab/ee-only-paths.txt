@@ -1,0 +1,27 @@
+# Paths that exist only in GitLab EE. Removing them from a gitlab-org/gitlab
+# checkout gives the gitlab-org/gitlab-foss tree.
+#
+# Read by merge-train (gitlab-foss sync), the as-if-foss CI jobs
+# (scripts/remove-ee-only-paths.sh) and hardened-builds. A change that adds an
+# EE-only path not covered here must update this file in the same commit.
+#
+# Format: one path or glob per line, relative to the repository root. Globs
+# use the POSIX subset: `*`, `?` and `[...]`, with `[!...]` for negation
+# (never `[^...]`). Lines whose first non-blank character is `#` are comments;
+# blank lines are ignored; surrounding whitespace is stripped.
+#
+# An entry must not contain `#` (no trailing comments), start or end with `/`,
+# contain an empty, `.` or `..` segment, or start with the `.git` segment.
+# Neither may any path it matches. Every match of an entry is removed with
+# `rm -rf`; an entry that matches nothing is a no-op. Consumers fail on an
+# invalid entry or a list with no entries.
+#
+# This file is not EE-only: it stays in the FOSS tree.
+ee
+domains/*/ee
+qa/spec/ee
+qa/qa/specs/features/ee
+qa/qa/ee
+qa/qa/ee.rb
+CHANGELOG-EE.md
+changelogs/*-ee.md

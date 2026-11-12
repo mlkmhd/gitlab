@@ -1,0 +1,53 @@
+# @feature_category: compliance_management
+query getSkillguardSkill($id: VulnerabilityID!) {
+  vulnerability(id: $id) {
+    id
+    title
+    severity
+    state
+    detectedAt
+    description
+    vulnerabilityPath
+    location {
+      ... on VulnerabilityLocationSast {
+        file
+        blobPath
+      }
+    }
+    identifiers {
+      externalType
+      externalId
+      name
+    }
+    project {
+      id
+      name
+      webPath
+    }
+    details {
+      ... on VulnerabilityDetailText {
+        fieldName
+        value
+      }
+      ... on VulnerabilityDetailNamedList {
+        fieldName
+        items {
+          fieldName
+          name
+          value {
+            ... on VulnerabilityDetailText {
+              value
+            }
+            ... on VulnerabilityDetailList {
+              items {
+                ... on VulnerabilityDetailText {
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

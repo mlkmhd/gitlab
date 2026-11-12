@@ -1,0 +1,16 @@
+# @feature_category: audit_events
+query listAmazonS3Configuration($fullPath: ID!) {
+  group(fullPath: $fullPath) {
+    id
+    amazonS3Configurations {
+      nodes {
+        id
+        name
+        accessKeyXid
+        awsRegion
+        bucketName
+        active
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+# @feature_category: code_review_workflow
+subscription approvalSummarySubscription($issuableId: IssuableID!) {
+  mergeRequestApprovalStateUpdated(issuableId: $issuableId) {
+    ... on MergeRequest {
+      id
+      approved
+      approvalsLeft: groupedApprovalsLeft
+      approvalsRequired: groupedApprovalsRequired
+      approvedBy {
+        nodes {
+          id
+        }
+      }
+      approvalState {
+        rules {
+          id
+          approved
+          approvalsRequired
+          name
+          type
+        }
+      }
+    }
+  }
+}

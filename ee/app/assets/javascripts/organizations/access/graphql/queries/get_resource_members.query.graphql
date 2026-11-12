@@ -1,0 +1,36 @@
+# @feature_category: organization
+query getOrganizationAccessResourceMembers(
+  $resourceId: String!
+  $roles: [ArtifactRegistryRole!]
+  $first: Int!
+  $after: String
+) {
+  artifactRegistryRoleAssignments(
+    resourceIds: [$resourceId]
+    roles: $roles
+    first: $first
+    after: $after
+  ) {
+    nodes {
+      resourceId
+      role
+      createdAt
+      assignee {
+        id
+        name
+        username
+        webPath
+        avatarUrl
+      }
+      userPermissions @gl_introduced(version: "19.6.0") {
+        updateRole
+        removeMember
+        leave
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

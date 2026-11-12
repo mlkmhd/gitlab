@@ -1,0 +1,116 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe IssuablesAnalytics, feature_category: :devops_reports do
+  describe '#data' do
+    let_it_be(:project) { create(:project, :empty_repo) }
+
+    # The hash key is the number of months back that the issue `created_at` will be.
+    # The hash value is the number of issues created for the month key.
+    let(:seed) do
+      { 0 => 2, 1 => 0, 2 => 1, 3 => 2, 4 => 1, 5 => 1, 6 => 1, 7 => 1, 8 => 1, 9 => 2, 10 => 1, 11 => 0 }
+    end
+
+    before do
+      travel_to(Time.current) do
+        seed.each_pair do |months_back, issues_count|
+          create_list(:issue, issues_count, project: project, created_at: months_back.months.ago)
+        end
+      end
+    end
+
+    shared_examples 'chart data by month' do
+      context 'when issuable relation is ordered by priority' do
+        it 'generates chart data correctly' do
+          issues = project.issues.order_labels_priority
+          data = described_class.new(issuables: issues).data
+
+          seed.each_pair do |months_back, issues_count|
+            date = months_back.months.ago.strftime(described_class::DATE_FORMAT)
+            expect(data[date]).to eq(issues_count)
+          end
+        end
+      end
+
+      context 'when months_back parameter is nil' do
+        it 'returns a hash containing the issues count created in the past 12 months' do
+          data = described_class.new(issuables: project.issues).data
+
+          seed.each_pair do |months_back, issues_count|
+            date = months_back.months.ago.strftime(described_class::DATE_FORMAT)
+            expect(data[date]).to eq(issues_count)
+          end
+        end
+      end
+
+      context 'when months_back parameter is present' do
+        it 'returns a hash containing the issues count created in the past x months' do
+          data = described_class.new(issuables: project.issues, months_back: 3).data
+
+          filtered_seed = seed.keep_if do |months_back, _|
+            months_back < 3
+          end
+
+          filtered_seed.each_pair do |months_back, issues_count|
+            date = months_back.months.ago.strftime(described_class::DATE_FORMAT)
+            expect(data[date]).to eq(issues_count)
+          end
+        end
+      end
+    end
+
+    context 'when issues_analytics_sql_aggregation is enabled' do
+      it_behaves_like 'chart data by month'
+    end
+
+    context 'when issues_analytics_sql_aggregation is disabled' do
+      before do
+        stub_feature_flags(issues_analytics_sql_aggregation: false)
+      end
+
+      it_behaves_like 'chart data by month'
+    end
+
+    it 'returns the same months and counts with and without SQL aggregation' do
+      stub_feature_flags(issues_analytics_sql_aggregation: false)
+      legacy_data = described_class.new(issuables: project.issues, months_back: 12).data
+
+      stub_feature_flags(issues_analytics_sql_aggregation: true)
+      data = described_class.new(issuables: project.issues, months_back: 12).data
+
+      expect(data).to eq(legacy_data)
+      expect(data.keys).to eq(legacy_data.keys)
+    end
+  end
+
+  describe '#data month boundaries' do
+    let_it_be(:project) { create(:project, :empty_repo) }
+    # 2026-07-01 11:30 in Pacific/Auckland, but still June in UTC.
+    let_it_be(:issue) { create(:issue, project: project, created_at: Time.utc(2026, 6, 30, 23, 30)) }
+
+    shared_examples 'counts an issue in the month of Time.zone' do
+      it 'counts the issue in July' do
+        travel_to(Time.utc(2026, 7, 15)) do
+          Time.use_zone('Pacific/Auckland') do
+            data = described_class.new(issuables: project.issues, months_back: 3).data
+
+            expect(data).to include('2026-06' => 0, '2026-07' => 1)
+          end
+        end
+      end
+    end
+
+    context 'when issues_analytics_sql_aggregation is enabled' do
+      it_behaves_like 'counts an issue in the month of Time.zone'
+    end
+
+    context 'when issues_analytics_sql_aggregation is disabled' do
+      before do
+        stub_feature_flags(issues_analytics_sql_aggregation: false)
+      end
+
+      it_behaves_like 'counts an issue in the month of Time.zone'
+    end
+  end
+end

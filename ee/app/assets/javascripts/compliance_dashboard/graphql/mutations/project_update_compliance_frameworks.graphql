@@ -1,0 +1,22 @@
+# @feature_category: compliance_management
+mutation projectUpdateComplianceFrameworks(
+  $projectId: ProjectID!
+  $complianceFrameworkIds: [ComplianceManagementFrameworkID!]!
+) {
+  projectUpdateComplianceFrameworks(
+    input: { projectId: $projectId, complianceFrameworkIds: $complianceFrameworkIds }
+  ) {
+    clientMutationId
+    errors
+    project {
+      id
+      complianceFrameworks {
+        nodes {
+          id
+          name
+          color
+        }
+      }
+    }
+  }
+}

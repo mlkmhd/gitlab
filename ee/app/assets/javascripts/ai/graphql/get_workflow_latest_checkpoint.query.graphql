@@ -1,0 +1,37 @@
+#import "./duo_message.fragment.graphql"
+
+query getWorkflowLatestCheckpoint(
+  $workflowId: AiDuoWorkflowsWorkflowID!
+  $paged: Boolean = false
+  $before: String
+) {
+  duoWorkflowWorkflows(workflowId: $workflowId) {
+    nodes {
+      id
+      status
+      title
+      aiCatalogItemVersionId
+      workflowDefinition
+      archived
+      stalled
+      webSearchEnabled
+      latestCheckpoint {
+        workflowGoal
+        workflowStatus
+        errors
+        duoMessages @skip(if: $paged) {
+          ...DuoMessageFields
+        }
+        messages(last: 50, before: $before) @include(if: $paged) {
+          nodes {
+            ...DuoMessageFields
+          }
+          pageInfo {
+            startCursor
+            hasPreviousPage
+          }
+        }
+      }
+    }
+  }
+}

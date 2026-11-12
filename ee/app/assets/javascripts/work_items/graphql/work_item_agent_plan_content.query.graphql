@@ -1,0 +1,16 @@
+#import "./work_item_agent_plan_content.fragment.graphql"
+
+# @feature_category: team_planning
+
+# Kept out of workItemAgentPlan, which is polled and subscribed to, because resolving the
+# content reads object storage. Only the open workplan panel needs it.
+query workItemAgentPlanContent($id: WorkItemID!) {
+  workItem(id: $id) {
+    id
+    features {
+      agentPlan {
+        ...WorkItemAgentPlanContentFragment
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+#import "../fragments/job_list_item.fragment.graphql"
+
+query getJobs(
+  $fullPath: ID!
+  $first: Int
+  $last: Int
+  $after: String
+  $before: String
+  $statuses: [CiJobStatus!]
+  $sources: [CiJobSource!]
+  $name: String
+  $kind: CiJobKind! = BUILD
+) {
+  project(fullPath: $fullPath) {
+    id
+    jobs(
+      first: $first
+      last: $last
+      after: $after
+      before: $before
+      statuses: $statuses
+      sources: $sources
+      name: $name
+      kind: $kind
+    ) {
+      pageInfo {
+        endCursor
+        hasNextPage
+        hasPreviousPage
+        startCursor
+      }
+      nodes {
+        ...JobListItem
+      }
+    }
+  }
+}

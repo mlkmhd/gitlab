@@ -1,0 +1,12 @@
+# @feature_category: audit_events
+mutation AddEventTypesToInstanceDestination(
+  $destinationId: AuditEventsInstanceExternalStreamingDestinationID!
+  $eventTypeFilters: [String!]!
+) {
+  auditEventsInstanceDestinationEventsAdd(
+    input: { destinationId: $destinationId, eventTypeFilters: $eventTypeFilters }
+  ) {
+    errors
+    eventTypeFilters
+  }
+}

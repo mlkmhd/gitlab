@@ -1,0 +1,9 @@
+# @feature_category: organization
+query getOrganizationAccessArtifactRegistry($organizationId: OrganizationsOrganizationID!) {
+  organization(id: $organizationId) {
+    id
+    artifactRegistry {
+      id
+    }
+  }
+}

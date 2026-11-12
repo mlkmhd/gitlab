@@ -1,0 +1,27 @@
+# @feature_category: compliance_management
+query complianceFrameworksWithControls($fullPath: ID!) {
+  namespace(fullPath: $fullPath) {
+    id
+    name
+    complianceFrameworks(first: 100) {
+      nodes {
+        id
+        name
+        color
+        description
+        complianceRequirements(first: 100) {
+          nodes {
+            id
+            name
+            complianceRequirementsControls(first: 100) {
+              nodes {
+                id
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

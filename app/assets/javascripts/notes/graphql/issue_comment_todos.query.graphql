@@ -1,0 +1,13 @@
+# @feature_category: notifications
+# The issuable alias matches merge_request_comment_todos.query.graphql
+# so noteable_note.vue can read both responses with the same update hook.
+query issueCommentTodos($id: IssueID!, $noteId: NoteID!) {
+  issuable: issue(id: $id) {
+    id
+    currentUserTodos(state: pending, noteId: $noteId) {
+      nodes {
+        id
+      }
+    }
+  }
+}

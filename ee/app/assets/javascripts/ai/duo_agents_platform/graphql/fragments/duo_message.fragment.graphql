@@ -1,0 +1,12 @@
+fragment AgentFlowDuoMessage on DuoMessage {
+  content
+  correlationId
+  role
+  messageType
+  messageSubType
+  componentName
+  subsessionId
+  status
+  timestamp
+  toolInfo
+}

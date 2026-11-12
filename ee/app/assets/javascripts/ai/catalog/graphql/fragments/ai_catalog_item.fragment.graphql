@@ -1,0 +1,47 @@
+fragment BaseAiCatalogItem on AiCatalogItem {
+  id
+  createdAt
+  itemType
+  description
+  descriptionHtml
+  foundationalFlowReference
+  foundational
+  verificationLevel
+  ... on AiCatalogAgent {
+    foundational
+    foundationalAgentReference
+  }
+  ... on AiCatalogFlow {
+    foundational
+    acceptsTriggerGoal @gl_introduced(version: "19.5.0")
+  }
+  ... on AiCatalogThirdPartyFlow {
+    acceptsTriggerGoal @gl_introduced(version: "19.5.0")
+  }
+  name
+  updatedAt
+  softDeleted
+  latestVersion {
+    id
+    versionName
+    createdAt
+    updatedAt
+    createdBy {
+      id
+      name
+      username
+      webUrl
+    }
+    ... on AiCatalogSkillVersion @gl_introduced(version: "19.5.0") {
+      authorName
+    }
+  }
+  userPermissions {
+    adminAiCatalogItem
+  }
+  starCount
+  starred
+  last30DayUsageCount
+  visibility
+  __typename
+}

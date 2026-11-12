@@ -1,0 +1,20 @@
+#import "./work_item_agent_plan.fragment.graphql"
+
+# @feature_category: team_planning
+mutation workItemEnableAiPlanning(
+  $input: WorkItemEnableAiPlanningInput!
+  $includeReadinessScore: Boolean = false
+) {
+  workItemEnableAiPlanning(input: $input) {
+    workItem {
+      id
+
+      features {
+        agentPlan {
+          ...WorkItemAgentPlanFragment
+        }
+      }
+    }
+    errors
+  }
+}

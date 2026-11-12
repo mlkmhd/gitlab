@@ -1,0 +1,9 @@
+# @feature_category: code_review_workflow
+query customEmojiPermissions($groupPath: ID!) {
+  group(fullPath: $groupPath) {
+    id
+    userPermissions {
+      createCustomEmoji
+    }
+  }
+}

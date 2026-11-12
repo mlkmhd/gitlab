@@ -1,0 +1,66 @@
+# @feature_category: duo_agent_platform
+#import "../fragments/flow.fragment.graphql"
+#import "../fragments/duo_message.fragment.graphql"
+
+query getAgentFlow(
+  $workflowId: AiDuoWorkflowsWorkflowID!
+  $loadMoreMessages: Boolean = false
+  $messagesPageSize: Int
+) {
+  duoWorkflowWorkflows(workflowId: $workflowId) {
+    edges {
+      node {
+        ...FlowFragment
+        triggerSource @gl_introduced(version: "19.6.0")
+        flowTrigger @gl_introduced(version: "19.6.0") {
+          id
+          description
+          project {
+            id
+            fullPath
+          }
+          group {
+            id
+            fullPath
+          }
+        }
+        agentName
+        latestCheckpoint {
+          duoMessages @skip(if: $loadMoreMessages) {
+            ...AgentFlowDuoMessage
+          }
+          messages(last: $messagesPageSize)
+            @include(if: $loadMoreMessages)
+            @gl_introduced(version: "19.6.0") {
+            edges {
+              cursor
+              node {
+                ...AgentFlowDuoMessage
+              }
+            }
+            pageInfo {
+              hasPreviousPage
+            }
+          }
+          latestTodoDuoMessage @include(if: $loadMoreMessages) @gl_introduced(version: "19.6.0") {
+            ...AgentFlowDuoMessage
+          }
+        }
+        summary
+        lastExecutorLogsUrl
+        allExecutorLogsUrls
+        createdAt
+        aiCatalogItem {
+          id
+          name
+          webPath
+        }
+        namespace @gl_introduced(version: "19.6.0") {
+          id
+          name
+          webPath
+        }
+      }
+    }
+  }
+}

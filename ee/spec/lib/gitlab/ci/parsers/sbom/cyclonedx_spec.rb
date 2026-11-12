@@ -1,0 +1,1072 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe Gitlab::Ci::Parsers::Sbom::Cyclonedx, feature_category: :dependency_management do
+  let(:third_party_sbom_support) { false }
+  let(:report) { Gitlab::Ci::Reports::Sbom::Report.new(third_party_sbom_support: third_party_sbom_support) }
+  let(:report_data) { base_report_data }
+  let(:raw_report_data) { report_data.to_json }
+  let(:report_valid?) { true }
+  let(:validator_errors) { [] }
+  let(:properties_parser) { Gitlab::Ci::Parsers::Sbom::CyclonedxProperties }
+  let(:uuid) { 'c9d550a3-feb8-483b-a901-5aa892d039f9' }
+
+  let(:base_report_data) do
+    {
+      'bomFormat' => 'CycloneDX',
+      'specVersion' => '1.4',
+      'version' => 1,
+      'serialNumber' => "urn:uuid:#{uuid}"
+    }
+  end
+
+  subject(:parse!) { described_class.new.parse!(raw_report_data, report) }
+
+  before do
+    allow_next_instance_of(Gitlab::Ci::Parsers::Sbom::Validators::CyclonedxSchemaValidator) do |validator|
+      allow(validator).to receive_messages(valid?: report_valid?, errors: validator_errors)
+    end
+
+    allow(SecureRandom).to receive(:uuid).and_return(uuid)
+  end
+
+  context 'when standard error is raised' do
+    let(:exception) { StandardError.new('some error') }
+
+    before do
+      allow_next_instance_of(Gitlab::Ci::Parsers::Sbom::Cyclonedx) do |cyclonedx|
+        allow(cyclonedx).to receive(:parse_report).and_raise(exception)
+      end
+    end
+
+    it 'adds error to the report and tracks exception' do
+      expect(report).to receive(:add_error).with('Unexpected error encountered')
+      expect(Gitlab::ErrorTracking).to receive(:track_exception).with(exception).and_call_original
+
+      parse!
+    end
+  end
+
+  context 'when report is invalid' do
+    context 'when report JSON is invalid' do
+      let(:raw_report_data) { '{ ' }
+
+      it 'handles errors and adds them to the report' do
+        expect(report).to receive(:add_error).with(a_string_including("Report JSON is invalid:"))
+
+        expect { parse! }.not_to raise_error
+      end
+    end
+
+    context 'when report does not conform to the CycloneDX schema' do
+      let(:report_valid?) { false }
+      let(:validator_errors) { %w[error1 error2] }
+
+      it 'reports all errors returned by the validator' do
+        expect(report).to receive(:add_error).with("error1")
+        expect(report).to receive(:add_error).with("error2")
+
+        parse!
+      end
+    end
+  end
+
+  context 'when cyclonedx report has no components' do
+    it 'skips component processing' do
+      expect(report).not_to receive(:add_component)
+
+      parse!
+    end
+  end
+
+  context 'when report has dependency_scanning components' do
+    let(:report_data) { base_report_data.merge({ 'components' => components }) }
+
+    let(:components) do
+      [
+        {
+          "name" => "activesupport",
+          "version" => "5.1.4",
+          "purl" => "pkg:gem/activesupport@5.1.4",
+          "type" => "library",
+          "bom-ref" => "pkg:gem/activesupport@5.1.4"
+        },
+        {
+          "name" => "byebug",
+          "version" => "10.0.0",
+          "purl" => "pkg:gem/byebug@10.0.0",
+          "type" => "library",
+          "bom-ref" => "pkg:gem/byebug@10.0.0"
+        },
+        {
+          "name" => "minimal-component",
+          "type" => "library"
+        },
+        {
+          # Should be skipped
+          "name" => "unrecognized-type",
+          "type" => "unknown"
+        }
+      ]
+    end
+
+    before do
+      allow(report).to receive(:add_component)
+    end
+
+    it 'adds each component, ignoring unused attributes' do
+      expect(report).to receive(:add_component)
+                          .with(
+                            an_object_having_attributes(
+                              name: "activesupport",
+                              version: "5.1.4",
+                              component_type: "library",
+                              purl: an_object_having_attributes(type: "gem")
+                            )
+                          )
+      expect(report).to receive(:add_component)
+                          .with(
+                            an_object_having_attributes(
+                              name: "byebug",
+                              version: "10.0.0",
+                              component_type: "library",
+                              purl: an_object_having_attributes(type: "gem")
+                            )
+                          )
+      expect(report).to receive(:add_component)
+                          .with(an_object_having_attributes(name: "minimal-component", version: nil,
+                            component_type: "library"))
+
+      parse!
+    end
+
+    context 'when component is trivy type' do
+      let(:parsed_properties) do
+        {
+          'PkgID' => 'activesupport@5.1.4',
+          'PkgType' => 'gem'
+        }
+      end
+
+      let(:components) do
+        [
+          {
+            # Trivy component
+            "bom-ref" => "0eda252d-d8a4-4250-b816-b6314f029063",
+            "type" => "library",
+            "name" => "analyzer",
+            "purl" => "pkg:gem/activesupport@5.1.4",
+            "properties" => [
+              {
+                "name" => "aquasecurity:trivy:PkgID",
+                "value" => "activesupport@5.1.4"
+              },
+              {
+                "name" => "aquasecurity:trivy:PkgType",
+                "value" => "gem"
+              }
+            ]
+          }
+        ]
+      end
+
+      it 'adds each component, ignoring unused attributes' do
+        expect(report).to receive(:add_component)
+          .with(
+            an_object_having_attributes(
+              component_type: "library",
+              properties: an_object_having_attributes(
+                data: parsed_properties
+              ),
+              purl: an_object_having_attributes(
+                type: "gem"
+              )
+            )
+          )
+        parse!
+      end
+    end
+
+    context 'when a component has an invalid purl' do
+      before do
+        components.push(
+          {
+            "name" => "invalid-component",
+            "version" => "v0.0.1",
+            "purl" => "pkg:nil",
+            "type" => "library"
+          }
+        )
+      end
+
+      it 'skips the component without invalidating the report' do
+        parse!
+
+        expect(report).to be_valid
+      end
+
+      it 'logs the skipped component' do
+        expect(Gitlab::AppJsonLogger).to receive(:warn).with(
+          message: 'Skipped SBOM component with invalid PURL',
+          purl: 'pkg:nil',
+          invalid_component_reason: 'Type is required'
+        )
+
+        parse!
+      end
+    end
+
+    context 'when a component has license information' do
+      let(:license_id) { "Apache-2.0" }
+      let(:license_url) { "https://www.apache.org/licenses/LICENSE-2.0.txt" }
+      let(:components) do
+        [
+          {
+            "type" => "library",
+            "group" => "com.acme",
+            "name" => "tomcat-catalina",
+            "version" => "9.0.14",
+            "licenses" => [
+              {
+                "license" => {
+                  "id" => license_id,
+                  "url" => license_url
+                }
+              }
+            ]
+          }
+        ]
+      end
+
+      it 'adds component with license information' do
+        expected_license = an_object_having_attributes(
+          spdx_identifier: license_id,
+          name: nil,
+          url: license_url)
+
+        expect(report).to receive(:add_component)
+                            .with(an_object_having_attributes(licenses: [expected_license]))
+
+        parse!
+      end
+    end
+
+    context 'when a component carries an SPDX license expression' do
+      let(:expression) { "Apache-2.0 AND (MIT OR GPL-2.0-only)" }
+
+      # Each CycloneDX version permits different sibling keys next to `expression`:
+      # 1.4 allows the bare expression, 1.5 adds `bom-ref`, 1.6 adds `acknowledgement`.
+      # 1.7 carries the same sibling keys forward.
+      {
+        '1.4' => {},
+        '1.5' => { "bom-ref" => "license-1" },
+        '1.6' => { "bom-ref" => "license-1", "acknowledgement" => "declared" },
+        '1.7' => { "bom-ref" => "license-1", "acknowledgement" => "declared" }
+      }.each do |version, extra_keys|
+        context "with CycloneDX spec version #{version}" do
+          let(:license_element) { { "expression" => expression }.merge(extra_keys) }
+          let(:components) do
+            [
+              {
+                "type" => "library",
+                "name" => "expression-pkg",
+                "version" => "1.0.0",
+                "purl" => "pkg:gem/expression-pkg@1.0.0",
+                "licenses" => [license_element]
+              }
+            ]
+          end
+
+          let(:report_data) { base_report_data.merge('specVersion' => version, 'components' => components) }
+
+          it 'ingests the expression and ignores version-specific sibling fields' do
+            expected_license = an_object_having_attributes(
+              expression: expression,
+              spdx_identifier: nil,
+              name: nil,
+              url: nil)
+
+            expect(report).to receive(:add_component)
+                                .with(an_object_having_attributes(licenses: [expected_license]))
+
+            parse!
+          end
+        end
+      end
+    end
+  end
+
+  context 'when report has container_scanning components' do
+    let(:report_data) { base_report_data.merge({ 'components' => components }) }
+
+    let(:parsed_properties) do
+      {
+        'SrcName' => 'alpine-baselayout'
+      }
+    end
+
+    let(:components) do
+      [
+        {
+          "name" => "alpine",
+          "version" => "3.4.3-r1",
+          "purl" => "pkg:apk/alpine/alpine@3.4.3-r1?arch=x86_64&distro=3.18.4",
+          "type" => "library",
+          "bom-ref" => "pkg:apk/alpine/alpine@3.4.3-r1?arch=x86_64&distro=3.18.4"
+        },
+        {
+          "name" => "alpine-baselayout-data",
+          "version" => "3.4.3-r1",
+          "purl" => "pkg:apk/alpine/alpine-baselayout-data@3.4.3-r1?arch=x86_64&distro=3.18.4",
+          "type" => "library",
+          "bom-ref" => "pkg:apk/alpine/alpine-baselayout-data@3.4.3-r1?arch=x86_64&distro=3.18.4",
+          "properties" => [
+            {
+              "name" => "aquasecurity:trivy:SrcName",
+              "value" => "alpine-baselayout"
+            }
+          ]
+        }
+      ]
+    end
+
+    before do
+      allow(report).to receive(:add_component)
+    end
+
+    it 'adds each component, ignoring unused attributes' do
+      expect(report).to receive(:add_component)
+        .with(
+          an_object_having_attributes(
+            name: "alpine",
+            version: "3.4.3-r1",
+            component_type: "library",
+            purl: an_object_having_attributes(type: "apk"),
+            properties: nil,
+            source_package_name: 'alpine'
+          )
+        )
+      expect(report).to receive(:add_component)
+        .with(
+          an_object_having_attributes(
+            name: "alpine-baselayout-data",
+            version: "3.4.3-r1",
+            component_type: "library",
+            purl: an_object_having_attributes(type: "apk"),
+            properties: an_object_having_attributes(
+              data: parsed_properties
+            ),
+            source_package_name: 'alpine-baselayout'
+          )
+        )
+
+      parse!
+    end
+  end
+
+  context 'when report has metadata tools, author and properties' do
+    let(:report_data) { base_report_data.merge(metadata) }
+
+    let(:tools) do
+      [
+        { name: 'Gemnasium', vendor: 'vendor-1', version: '2.34.0' },
+        { name: 'Gemnasium', vendor: 'vendor-2', version: '2.34.0' }
+      ]
+    end
+
+    let(:authors) do
+      [
+        { name: 'author-1', email: 'support@gitlab.com' },
+        { name: 'author-2', email: 'support@gitlab.com' }
+      ]
+    end
+
+    let(:properties) do
+      [
+        { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+        { 'name' => 'gitlab:dependency_scanning:category', 'value' => 'development' },
+        { 'name' => 'gitlab:dependency_scanning:input_file:path', 'value' => 'package-lock.json' },
+        { 'name' => 'gitlab:dependency_scanning:source_file:path', 'value' => 'package.json' },
+        { 'name' => 'gitlab:dependency_scanning:package_manager:name', 'value' => 'npm' },
+        { 'name' => 'gitlab:dependency_scanning:language:name', 'value' => 'JavaScript' }
+      ]
+    end
+
+    context 'when metadata attributes are present' do
+      let(:metadata) do
+        {
+          'metadata' => {
+            'tools' => tools,
+            'authors' => authors,
+            'properties' => properties
+          }
+        }
+      end
+
+      it 'passes them to the report' do
+        expect(properties_parser).to receive(:parse_source).with(properties)
+
+        parse!
+
+        expect(report.metadata).to have_attributes(
+          tools: tools.map(&:with_indifferent_access),
+          authors: authors.map(&:with_indifferent_access),
+          properties: properties.map(&:with_indifferent_access)
+        )
+      end
+    end
+
+    context 'when metadata attributes are not present' do
+      let(:metadata) { { 'metadata' => {} } }
+
+      it 'passes them to the report' do
+        expect(properties_parser).to receive(:parse_source).with(nil)
+
+        parse!
+
+        expect(report.metadata).to have_attributes(
+          tools: [],
+          authors: [],
+          properties: []
+        )
+      end
+    end
+  end
+
+  context 'when cyclonedx report has no dependencies' do
+    it 'skips component processing' do
+      expect(report).not_to receive(:add_dependency)
+
+      parse!
+    end
+  end
+
+  context 'when report has dependencies' do
+    let(:report_data) { base_report_data.merge({ 'dependencies' => [{ ref: 'ref', dependsOn: ['dependency_ref'] }] }) }
+
+    it 'passes dependencies to report' do
+      expect(report).to receive(:add_dependency).with('ref', 'dependency_ref')
+
+      parse!
+    end
+  end
+
+  context 'when report has components with reachability' do
+    let(:report_data) { base_report_data.merge({ 'components' => components }) }
+
+    let(:parsed_properties) do
+      {
+        'reachability' => 'in_use'
+      }
+    end
+
+    let(:components) do
+      [
+        {
+          "name" => "GitPython",
+          "version" => "3.1.44",
+          "purl" => "pkg:pypi/GitPython@3.1.44",
+          "type" => "library",
+          "bom-ref" => "pkg:pypi/GitPython@3.1.44",
+          "properties" => [
+            {
+              "name" => "gitlab:dependency_scanning_component:reachability",
+              "value" => "in_use"
+            }
+          ]
+        }
+      ]
+    end
+
+    before do
+      allow(report).to receive(:add_component)
+    end
+
+    it 'adds component with the reachability property' do
+      expect(report).to receive(:add_component)
+        .with(
+          an_object_having_attributes(
+            name: "gitpython",
+            version: "3.1.44",
+            component_type: "library",
+            purl: an_object_having_attributes(type: "pypi"),
+            properties: an_object_having_attributes(
+              data: parsed_properties
+            )
+          )
+        )
+      parse!
+    end
+  end
+
+  context 'when metadata component is present' do
+    let(:ref) { 'urn:uuid:bbd321e1-f802-4fc1-ab0d-0cc629c3d53a' }
+    let(:type) { 'application' }
+    let(:name) { 'Root Application' }
+
+    let(:component) do
+      {
+        'type' => type,
+        'name' => name,
+        'bom-ref' => ref
+      }
+    end
+
+    let(:report_data) do
+      base_report_data.merge({ 'metadata' => { 'component' => component } })
+    end
+
+    it 'sets report metadata component' do
+      expect(report).to receive(:set_metadata_component)
+        .with(an_object_having_attributes(ref: ref, name: name, type: type))
+
+      parse!
+    end
+
+    context 'with incomplete component' do
+      let(:component) do
+        {
+          'type' => type,
+          'name' => name
+        }
+      end
+
+      it 'doesnt set report metadata component' do
+        expect(report).not_to receive(:set_metadata_component)
+
+        parse!
+      end
+    end
+
+    context 'when metadata component has file sub-components and a dependency_scanning source' do
+      let(:properties) do
+        [
+          { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+          { 'name' => 'gitlab:dependency_scanning:input_file:path', 'value' => 'subdir1/Gemfile.lock' },
+          { 'name' => 'gitlab:dependency_scanning:package_manager:name', 'value' => 'bundler' }
+        ]
+      end
+
+      let(:component) do
+        {
+          'type' => type,
+          'name' => name,
+          'bom-ref' => ref,
+          'components' => [
+            {
+              'type' => 'file',
+              'name' => 'subdir1/Gemfile',
+              'bom-ref' => 'file:subdir1/Gemfile',
+              'properties' => [
+                { 'name' => 'gitlab:dependency_scanning:file:type', 'value' => 'requirements' },
+                { 'name' => 'gitlab:dependency_scanning:file:in_repository', 'value' => 'true' }
+              ]
+            },
+            {
+              'type' => 'file',
+              'name' => 'subdir1/Gemfile.lock',
+              'bom-ref' => 'file:subdir1/Gemfile.lock',
+              'properties' => [
+                { 'name' => 'gitlab:dependency_scanning:file:type', 'value' => 'lockfile' },
+                { 'name' => 'gitlab:dependency_scanning:file:in_repository', 'value' => 'true' }
+              ]
+            }
+          ]
+        }
+      end
+
+      let(:report_data) do
+        base_report_data.merge({
+          'metadata' => {
+            'component' => component,
+            'properties' => properties
+          }
+        })
+      end
+
+      it 'sets source data with the files array' do
+        parse!
+
+        expect(report.source).to have_attributes(
+          source_type: :dependency_scanning,
+          data: include(
+            'files' => [
+              { 'path' => 'subdir1/Gemfile',      'type' => 'requirements', 'in_repository' => true },
+              { 'path' => 'subdir1/Gemfile.lock', 'type' => 'lockfile',     'in_repository' => true }
+            ]
+          )
+        )
+      end
+    end
+
+    context 'when metadata component has no file sub-components' do
+      let(:properties) do
+        [
+          { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+          { 'name' => 'gitlab:dependency_scanning:input_file:path', 'value' => 'Gemfile.lock' },
+          { 'name' => 'gitlab:dependency_scanning:package_manager:name', 'value' => 'bundler' }
+        ]
+      end
+
+      let(:report_data) do
+        base_report_data.merge({
+          'metadata' => {
+            'component' => component,
+            'properties' => properties
+          }
+        })
+      end
+
+      it 'does not set files on source data' do
+        parse!
+
+        expect(report.source.data).not_to have_key('files')
+      end
+    end
+  end
+
+  context 'with third-party SBOMs' do
+    using RSpec::Parameterized::TableSyntax
+
+    let(:default_path) { '3rd Party Input File Path Unknown' }
+    let(:skipped_message) { 'Skipped third-party SBOM component' }
+    let(:spec_version) { '1.5' }
+    let(:metadata) { {} }
+
+    let(:commons_io) do
+      {
+        'type' => 'library',
+        'bom-ref' => 'pkg:maven/commons-io/commons-io@2.4',
+        'name' => 'commons-io',
+        'version' => '2.4',
+        'purl' => 'pkg:maven/commons-io/commons-io@2.4'
+      }
+    end
+
+    let(:commons_text_framework) do
+      {
+        'type' => 'framework',
+        'bom-ref' => 'pkg:maven/org.apache.commons/commons-text@1.8',
+        'name' => 'commons-text',
+        'version' => '1.8',
+        'purl' => 'pkg:maven/org.apache.commons/commons-text@1.8'
+      }
+    end
+
+    let(:lodash) do
+      {
+        'type' => 'library',
+        'bom-ref' => 'pkg:npm/lodash@4.17.21',
+        'name' => 'lodash',
+        'version' => '4.17.21',
+        'purl' => 'pkg:npm/lodash@4.17.21'
+      }
+    end
+
+    let(:operating_system_components) do
+      [
+        { 'type' => 'library', 'bom-ref' => 'deb', 'name' => 'bash', 'version' => '5.2.15-2+b7',
+          'purl' => 'pkg:deb/debian/bash@5.2.15-2+b7?distro=debian-12.15' },
+        { 'type' => 'library', 'bom-ref' => 'apk', 'name' => 'musl', 'version' => '1.2.5-r3',
+          'purl' => 'pkg:apk/alpine/musl@1.2.5-r3?distro=3.20.10' },
+        { 'type' => 'library', 'bom-ref' => 'rpm', 'name' => 'glibc', 'version' => '2.34-100.el9',
+          'purl' => 'pkg:rpm/redhat/glibc@2.34-100.el9?distro=redhat-9.4' }
+      ]
+    end
+
+    let(:components) { [commons_io, commons_text_framework, lodash] }
+
+    let(:report_data) do
+      base_report_data.merge('specVersion' => spec_version, 'metadata' => metadata, 'components' => components)
+    end
+
+    before do
+      allow(Gitlab::Ci::Parsers::Sbom::Validators::CyclonedxSchemaValidator).to receive(:new).and_call_original
+      allow(Gitlab::AppJsonLogger).to receive(:info).and_call_original
+    end
+
+    shared_examples 'components that keep no source file' do
+      context 'when the SBOM lists operating system packages' do
+        let(:components) { [*operating_system_components, commons_io, lodash] }
+
+        it 'gives each operating system package no source file and its name as the source package name' do
+          parse!
+
+          expect(report.components).to include(
+            have_attributes(name: 'bash', path: nil, source_package_name: 'bash'),
+            have_attributes(name: 'musl', path: nil, source_package_name: 'musl'),
+            have_attributes(name: 'glibc', path: nil, source_package_name: 'glibc')
+          )
+        end
+      end
+
+      context 'when the SBOM declares an input file of the GitLab DS analyzer without a schema version' do
+        let(:metadata) do
+          { 'properties' => [{ 'name' => 'gitlab:dependency_scanning:input_file:path', 'value' => 'core/pom.xml' }] }
+        end
+
+        it 'gives no source file to the components' do
+          parse!
+
+          expect(report.source).to be_nil
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+      end
+
+      context 'when the SBOM declares a source of GitLab container scanning' do
+        let(:metadata) do
+          {
+            'properties' => [
+              { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+              { 'name' => 'gitlab:container_scanning:image:name', 'value' => 'registry.example.com/app' },
+              { 'name' => 'gitlab:container_scanning:image:tag', 'value' => '1.0' }
+            ]
+          }
+        end
+
+        it 'keeps the declared source and gives no source file to the components' do
+          parse!
+
+          expect(report.source.source_type).to eq(:container_scanning)
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+      end
+
+      context 'when the SBOM declares GitLab container scanning properties without an image tag' do
+        let(:metadata) do
+          {
+            'properties' => [
+              { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+              { 'name' => 'gitlab:container_scanning:image:name', 'value' => 'registry.example.com/app' },
+              { 'name' => 'gitlab:container_scanning:operating_system:name', 'value' => 'debian' },
+              { 'name' => 'gitlab:container_scanning:operating_system:version', 'value' => '12.15' }
+            ]
+          }
+        end
+
+        it 'gives no source file to the components' do
+          parse!
+
+          expect(report.source).to be_nil
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+      end
+
+      context 'when the SBOM declares GitLab registry scanning properties without an image tag' do
+        let(:metadata) do
+          {
+            'properties' => [
+              { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+              { 'name' => 'gitlab:container_scanning_for_registry:image:name', 'value' => 'registry.example.com/app' }
+            ]
+          }
+        end
+
+        it 'gives no source file to the components' do
+          parse!
+
+          expect(report.source).to be_nil
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+      end
+
+      context 'when the SBOM declares a source of GitLab registry scanning' do
+        let(:metadata) do
+          {
+            'properties' => [
+              { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+              { 'name' => 'gitlab:container_scanning_for_registry:image:name', 'value' => 'registry.example.com/app' },
+              { 'name' => 'gitlab:container_scanning_for_registry:image:tag', 'value' => '1.0' }
+            ]
+          }
+        end
+
+        it 'keeps the declared source and gives no source file to the components' do
+          parse!
+
+          expect(report.source.source_type).to eq(:container_scanning_for_registry)
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+      end
+
+      context 'when the SBOM declares the GitLab DS analyzer input file' do
+        let(:metadata) do
+          {
+            'properties' => [
+              { 'name' => 'gitlab:meta:schema_version', 'value' => '1' },
+              { 'name' => 'gitlab:dependency_scanning:input_file:path', 'value' => 'core/pom.xml' }
+            ]
+          }
+        end
+
+        it 'keeps the declared source and gives no source file to the components' do
+          parse!
+
+          expect(report.source).to have_attributes(source_type: :dependency_scanning, input_file_path: 'core/pom.xml')
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: nil),
+            have_attributes(name: 'lodash', path: nil)
+          )
+        end
+
+        context 'when its components carry properties that other generators write' do
+          let(:spec_version) { '1.6' }
+          let(:other_generators_properties) do
+            [
+              { 'name' => 'syft:location:0:path', 'value' => '/other/pom.xml' },
+              { 'name' => 'internal:SrcFile', 'value' => 'another/pom.xml' },
+              { 'name' => 'aquasecurity:trivy:FilePath', 'value' => 'opt/app.jar' }
+            ]
+          end
+
+          let(:components) do
+            [
+              commons_io.merge('properties' => other_generators_properties),
+              lodash.merge('properties' => other_generators_properties),
+              { 'type' => 'framework', 'bom-ref' => 'evidence', 'name' => 'evidence', 'version' => '1.0',
+                'purl' => 'pkg:maven/example/evidence@1.0',
+                'evidence' => { 'identity' => [{ 'field' => 'purl', 'confidence' => 0.5 }] } }
+            ]
+          end
+
+          it 'gives no source file to the components and keeps the framework out' do
+            parse!
+
+            expect(report.source.input_file_path).to eq('core/pom.xml')
+            expect(report.components).to contain_exactly(
+              have_attributes(name: 'commons-io/commons-io', path: nil, type: 'library'),
+              have_attributes(name: 'lodash', path: nil, type: 'library')
+            )
+          end
+        end
+      end
+    end
+
+    describe 'the choice of the third-party reading' do
+      let(:metadata) do
+        property_name ? { 'properties' => [{ 'name' => property_name, 'value' => '1' }] } : {}
+      end
+
+      where(:third_party_sbom_support, :property_name, :path) do
+        true  | nil                          | '3rd Party Input File Path Unknown'
+        true  | 'other-generator:property'   | '3rd Party Input File Path Unknown'
+        true  | 'gitlab:meta:schema_version' | nil
+        false | nil                          | nil
+        false | 'other-generator:property'   | nil
+        false | 'gitlab:meta:schema_version' | nil
+      end
+
+      with_them do
+        it 'lists the components at the default location only with third-party SBOM support and no GitLab property' do
+          parse!
+
+          expect(report.components).to contain_exactly(have_attributes(path: path), have_attributes(path: path))
+        end
+      end
+    end
+
+    context 'when the feature flag is disabled' do
+      let(:third_party_sbom_support) { false }
+
+      it_behaves_like 'components that keep no source file'
+
+      it 'gives no source file to the components' do
+        parse!
+
+        expect(report.errors).to be_empty
+        expect(report.source).to be_nil
+        expect(report.components).to contain_exactly(
+          have_attributes(name: 'commons-io/commons-io', path: nil),
+          have_attributes(name: 'lodash', path: nil)
+        )
+      end
+
+      it 'logs no skipped component' do
+        parse!
+
+        expect(Gitlab::AppJsonLogger).not_to have_received(:info).with(hash_including(message: skipped_message))
+      end
+    end
+
+    context 'when the feature flag is enabled' do
+      let(:third_party_sbom_support) { true }
+
+      it_behaves_like 'components that keep no source file'
+
+      it 'lists each library at the default location and skips the framework' do
+        parse!
+
+        expect(report.errors).to be_empty
+        expect(report.components).to contain_exactly(
+          have_attributes(name: 'commons-io/commons-io', path: default_path),
+          have_attributes(name: 'lodash', path: default_path)
+        )
+      end
+
+      it 'logs the skipped framework with the count for its reason' do
+        parse!
+
+        expect(Gitlab::AppJsonLogger).to have_received(:info).with(
+          message: skipped_message,
+          skipped_component_count_by_reason: { 'unsupported component type' => 1 }
+        ).once
+      end
+
+      context 'when the SBOM lists several components that are not libraries' do
+        let(:components) do
+          [
+            commons_io, commons_text_framework, lodash,
+            { 'type' => 'file', 'bom-ref' => 'file-1', 'name' => '/app/a' },
+            { 'type' => 'file', 'bom-ref' => 'file-2', 'name' => '/app/b' }
+          ]
+        end
+
+        it 'logs one line for the report with the count of components for the reason' do
+          parse!
+
+          expect(Gitlab::AppJsonLogger).to have_received(:info).with(
+            message: skipped_message,
+            skipped_component_count_by_reason: { 'unsupported component type' => 3 }
+          ).once
+        end
+      end
+
+      context 'when the SBOM lists operating system packages and libraries' do
+        let(:components) { [*operating_system_components, commons_io, lodash] }
+
+        it 'gives the operating system packages no source file and the libraries the default location' do
+          parse!
+
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'bash', path: nil),
+            have_attributes(name: 'musl', path: nil),
+            have_attributes(name: 'glibc', path: nil),
+            have_attributes(name: 'commons-io/commons-io', path: default_path),
+            have_attributes(name: 'lodash', path: default_path)
+          )
+        end
+      end
+
+      context 'when the SBOM is invalid against the CycloneDX schema' do
+        let(:components) { [{ 'type' => 'library', 'name' => 'lib', 'version' => '' }] }
+
+        it 'rejects the SBOM with the schema errors' do
+          parse!
+
+          expect(report.errors).to include(a_string_matching(%r{/components/0/version}))
+          expect(report.components).to be_empty
+        end
+      end
+
+      context 'when the SBOM lists no components' do
+        let(:components) { [] }
+
+        it 'adds no component without an error' do
+          parse!
+
+          expect(report.errors).to be_empty
+          expect(report.components).to be_empty
+        end
+      end
+
+      context 'when the SBOM lists a library twice under different references' do
+        let(:components) { [commons_io, commons_io.merge('bom-ref' => 'other-reference')] }
+
+        it 'adds a component for each listing' do
+          parse!
+
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io', path: default_path),
+            have_attributes(name: 'commons-io/commons-io', path: default_path)
+          )
+        end
+      end
+
+      context 'when a library has no package URL' do
+        let(:components) do
+          [{ 'type' => 'library', 'bom-ref' => 'no-purl', 'name' => 'no-purl-lib', 'version' => '1.0' }]
+        end
+
+        it 'lists it at the default location' do
+          parse!
+
+          expect(report.errors).to be_empty
+          expect(report.components).to contain_exactly(have_attributes(name: 'no-purl-lib', path: default_path))
+        end
+      end
+
+      context 'when a library has a package URL type that is not supported' do
+        let(:components) do
+          [
+            { 'type' => 'library', 'bom-ref' => 'unsupported', 'name' => 'other', 'version' => '1.0',
+              'purl' => 'pkg:github/example/other@1.0' },
+            commons_io, commons_text_framework, lodash
+          ]
+        end
+
+        it 'skips it without an error' do
+          parse!
+
+          expect(report.errors).to be_empty
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io'),
+            have_attributes(name: 'lodash')
+          )
+        end
+
+        it 'logs one line for the report with the count for each reason' do
+          parse!
+
+          expect(Gitlab::AppJsonLogger).to have_received(:info).with(
+            message: skipped_message,
+            skipped_component_count_by_reason: { 'unsupported package URL type' => 1,
+                                                 'unsupported component type' => 1 }
+          ).once
+        end
+      end
+
+      context 'when a library has a package URL that cannot be parsed' do
+        let(:components) do
+          [
+            { 'type' => 'library', 'bom-ref' => 'invalid', 'name' => 'invalid', 'version' => '1.0',
+              'purl' => 'pkg:nil' },
+            commons_io, commons_text_framework, lodash
+          ]
+        end
+
+        it 'skips it without invalidating the report' do
+          allow(Gitlab::AppJsonLogger).to receive(:warn)
+
+          parse!
+
+          expect(report).to be_valid
+          expect(report.components).to contain_exactly(
+            have_attributes(name: 'commons-io/commons-io'),
+            have_attributes(name: 'lodash')
+          )
+          expect(Gitlab::AppJsonLogger).to have_received(:warn).with(
+            message: 'Skipped SBOM component with invalid PURL',
+            purl: 'pkg:nil',
+            invalid_component_reason: 'Type is required'
+          )
+        end
+      end
+    end
+  end
+end

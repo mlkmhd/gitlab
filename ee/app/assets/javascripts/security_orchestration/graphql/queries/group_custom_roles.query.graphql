@@ -1,0 +1,23 @@
+# @feature_category: security_policy_management
+query groupCustomRoles($fullPath: ID!) {
+  group(fullPath: $fullPath) {
+    id
+    memberRoles {
+      nodes {
+        id
+        name
+        baseAccessLevel {
+          stringValue
+        }
+        enabledPermissions {
+          edges {
+            node {
+              value
+            }
+          }
+        }
+      }
+    }
+    __typename
+  }
+}

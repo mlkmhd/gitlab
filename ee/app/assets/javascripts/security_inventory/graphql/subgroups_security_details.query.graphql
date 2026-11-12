@@ -1,0 +1,62 @@
+# @feature_category: security_asset_inventories
+query SubgroupsSecurityDetails(
+  $fullPath: ID!
+  $subgroupsFirst: Int
+  $subgroupsAfter: String
+  $subgroupsLast: Int
+  $subgroupsBefore: String
+  $showCapabilities: Boolean = false
+) {
+  group(fullPath: $fullPath) {
+    id
+    descendantGroups(
+      archived: false
+      includeParentDescendants: false
+      first: $subgroupsFirst
+      after: $subgroupsAfter
+      last: $subgroupsLast
+      before: $subgroupsBefore
+    ) {
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      nodes {
+        __typename
+        id
+        name
+        descendantGroupsCount
+        projectsCount
+        path
+        fullPath
+        avatarUrl
+        webUrl
+        updatedAt
+        analyzerStatuses {
+          success
+          failure
+          notConfigured
+          stale
+          analyzerType
+          totalProjectsCount
+          updatedAt
+        }
+        vulnerabilityNamespaceStatistic {
+          critical
+          high
+          low
+          info
+          medium
+          unknown
+          updatedAt
+        }
+        triageAndRemediationCoverageCounters @include(if: $showCapabilities) {
+          enabledCount
+          flowMissingCount @gl_introduced(version: "19.6.0")
+        }
+      }
+    }
+  }
+}

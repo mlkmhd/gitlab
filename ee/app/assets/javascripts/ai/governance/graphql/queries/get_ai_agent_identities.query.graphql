@@ -1,0 +1,75 @@
+# @feature_category: compliance_management
+#import "~/graphql_shared/fragments/page_info.fragment.graphql"
+
+fragment AiAgentIdentityFields on AiAgentIdentity {
+  id
+  agentType
+  user {
+    id
+    name
+    username
+    avatarUrl
+    webPath
+  }
+  project @skip(if: $isProject) {
+    id
+    nameWithNamespace
+    webPath
+  }
+  createdAt
+  lastSyncedAt
+  status
+  sessionCount
+}
+
+query getAiAgentIdentities(
+  $groupFullPath: ID!
+  $projectFullPath: ID!
+  $isProject: Boolean = false
+  $agentTypes: [AiExternalAgentType!]
+  $userId: UserID
+  $status: AiAgentIdentityStatus
+  $first: Int
+  $last: Int
+  $after: String
+  $before: String
+) {
+  group(fullPath: $groupFullPath) @skip(if: $isProject) {
+    id
+    aiAgentIdentities(
+      agentTypes: $agentTypes
+      userId: $userId
+      status: $status
+      first: $first
+      last: $last
+      after: $after
+      before: $before
+    ) @gl_introduced(version: "19.6.0") {
+      nodes {
+        ...AiAgentIdentityFields
+      }
+      pageInfo {
+        ...PageInfo
+      }
+    }
+  }
+  project(fullPath: $projectFullPath) @include(if: $isProject) {
+    id
+    aiAgentIdentities(
+      agentTypes: $agentTypes
+      userId: $userId
+      status: $status
+      first: $first
+      last: $last
+      after: $after
+      before: $before
+    ) @gl_introduced(version: "19.6.0") {
+      nodes {
+        ...AiAgentIdentityFields
+      }
+      pageInfo {
+        ...PageInfo
+      }
+    }
+  }
+}

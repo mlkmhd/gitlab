@@ -1,0 +1,6 @@
+# @feature_category: audit_events
+mutation deleteInstanceExternalDestinationHeader($headerId: AuditEventsStreamingInstanceHeaderID!) {
+  auditEventsStreamingInstanceHeadersDestroy(input: { headerId: $headerId }) {
+    errors
+  }
+}

@@ -1,0 +1,15 @@
+fragment BaseWorkItemPopover on WorkItem {
+  id
+  iid
+  confidential
+  createdAt
+  fullReference: reference(full: true)
+  state
+  title
+  titleHtml
+  workItemType {
+    id
+    name
+    iconName
+  }
+}

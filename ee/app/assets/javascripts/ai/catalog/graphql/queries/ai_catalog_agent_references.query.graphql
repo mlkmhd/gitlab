@@ -1,0 +1,9 @@
+# @feature_category: ai_catalog_curation
+query aiCatalogAgentReferences($search: String, $first: Int) {
+  aiCatalogItems(itemTypes: [AGENT], search: $search, first: $first) {
+    nodes {
+      id
+      name
+    }
+  }
+}

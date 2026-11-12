@@ -1,0 +1,20 @@
+# @feature_category: audit_events
+query getNamespaceFilters($fullPath: ID!, $search: String) {
+  group(fullPath: $fullPath) {
+    id
+    projects(includeSubgroups: true, search: $search) {
+      nodes {
+        id
+        name
+        fullPath
+      }
+    }
+    descendantGroups(search: $search) {
+      nodes {
+        id
+        name
+        fullPath
+      }
+    }
+  }
+}

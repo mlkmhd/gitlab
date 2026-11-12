@@ -1,0 +1,55 @@
+import { pinia } from '~/pinia/instance';
+import {
+  MOUNTED,
+  COLLAPSE_FILE,
+  COLLAPSE_FILE_BY_USER,
+  EXPAND_FILE,
+} from '~/rapid_diffs/adapter_events';
+import { useCodeReview } from '~/diffs/stores/code_review';
+import { useDiffsList } from '~/rapid_diffs/stores/diffs_list';
+
+function getViewedStyleElement(id) {
+  // The startup script only adds these to <head>. A document-wide miss walks every
+  // node, once per mounted file, which costs about 300 ms on a 1000-file MR.
+  return document.head.querySelector(`style[data-viewed-file-style="${id}"]`);
+}
+
+export const viewedAdapter = {
+  clicks: {
+    toggleViewed(event, checkbox) {
+      const store = useCodeReview(pinia);
+      const isViewed = checkbox.checked;
+      const fileId = this.data.codeReviewId;
+
+      store.setReviewed(fileId, isViewed);
+
+      this.diffElement.toggleAttribute('data-viewed', isViewed);
+
+      if (isViewed) {
+        this.trigger(COLLAPSE_FILE_BY_USER);
+      } else {
+        this.trigger(EXPAND_FILE);
+      }
+    },
+  },
+  [MOUNTED]() {
+    const checkbox = this.diffElement.querySelector('[data-viewed-checkbox]');
+    if (!checkbox) return;
+    if (!this.appData.codeReviewEnabled) return;
+
+    const store = useCodeReview(pinia);
+    const fileId = this.data.codeReviewId;
+    const isViewed = Boolean(store.reviewedIds[fileId]);
+
+    // Remove FOUC style - JS now controls collapse/expand via details element
+    getViewedStyleElement(fileId)?.remove();
+
+    checkbox.disabled = false;
+    checkbox.checked = isViewed;
+    this.diffElement.toggleAttribute('data-viewed', isViewed);
+
+    if (isViewed && !useDiffsList(pinia).isLinkedFile(this.data)) {
+      this.trigger(COLLAPSE_FILE);
+    }
+  },
+};

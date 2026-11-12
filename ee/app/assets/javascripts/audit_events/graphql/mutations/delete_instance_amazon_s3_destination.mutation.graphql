@@ -1,0 +1,6 @@
+# @feature_category: audit_events
+mutation deleteInstanceAmazonS3Destination($id: AuditEventsInstanceAmazonS3ConfigurationID!) {
+  auditEventsInstanceAmazonS3ConfigurationDelete(input: { id: $id }) {
+    errors
+  }
+}

@@ -1,0 +1,13 @@
+# @feature_category: compliance_management
+query violationsGroupProjects($groupPath: ID!, $projectIds: [ID!] = null) {
+  group(fullPath: $groupPath) {
+    id
+    projects(ids: $projectIds, includeSubgroups: true) {
+      nodes {
+        id
+        name
+        fullPath
+      }
+    }
+  }
+}

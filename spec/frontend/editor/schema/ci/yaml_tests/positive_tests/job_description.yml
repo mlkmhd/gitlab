@@ -1,0 +1,7 @@
+job_with_description:
+  script: echo
+  description: Unit tests for the application
+
+trigger_job_with_description:
+  trigger: my-group/my-project
+  description: Deploy the downstream project

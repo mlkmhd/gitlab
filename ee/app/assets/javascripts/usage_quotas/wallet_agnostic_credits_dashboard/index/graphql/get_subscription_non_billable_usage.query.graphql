@@ -1,0 +1,27 @@
+# @feature_category: consumables_cost_management
+
+query getSubscriptionNonBillableUsage(
+  $namespacePath: ID
+  $organizationId: OrganizationsOrganizationID
+  $startDate: ISO8601Date
+  $endDate: ISO8601Date
+  $flowTypes: [String!]
+) {
+  subscriptionUsage(
+    namespacePath: $namespacePath
+    organizationId: $organizationId
+    startDate: $startDate
+    endDate: $endDate
+    flowTypes: $flowTypes
+  ) {
+    nonBillableUsage @gl_introduced(version: "19.5.0") {
+      productId
+      skipReason
+      totalCreditsUsed
+      dailyUsage {
+        creditsUsed
+        date
+      }
+    }
+  }
+}

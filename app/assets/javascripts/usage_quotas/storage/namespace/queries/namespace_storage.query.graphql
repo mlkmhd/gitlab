@@ -1,0 +1,18 @@
+# @feature_category: consumables_cost_management
+query getNamespaceStorageStatistics($fullPath: ID!) {
+  namespace(fullPath: $fullPath) {
+    id
+    rootStorageStatistics {
+      storageSize
+      repositorySize
+      lfsObjectsSize
+      containerRegistrySize
+      containerRegistrySizeIsEstimated
+      dependencyProxySize
+      buildArtifactsSize
+      packagesSize
+      wikiSize
+      snippetsSize
+    }
+  }
+}

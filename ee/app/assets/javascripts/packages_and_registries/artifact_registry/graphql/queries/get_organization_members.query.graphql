@@ -1,0 +1,22 @@
+# @feature_category: artifact_registry
+
+query getArtifactRegistryOrganizationMembers(
+  $organizationId: OrganizationsOrganizationID!
+  $search: String!
+  $first: Int!
+) {
+  organization(id: $organizationId) {
+    id
+    organizationUsers(search: $search, first: $first) {
+      nodes {
+        id
+        user {
+          id
+          name
+          username
+          avatarUrl
+        }
+      }
+    }
+  }
+}

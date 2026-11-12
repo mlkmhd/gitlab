@@ -1,0 +1,21 @@
+# @feature_category: portfolio_management
+query getWorkItemsAiSessions($fullPath: ID!, $ids: [WorkItemID!]) {
+  namespace(fullPath: $fullPath) {
+    id
+    workItems(ids: $ids, includeDescendants: true) {
+      nodes {
+        id
+        widgets(onlyTypes: [AI_SESSION]) {
+          type
+          ... on WorkItemWidgetAiSession {
+            agentPresence {
+              sessionId
+            }
+            agentPresenceStatus
+            agentPresenceHumanStatus
+          }
+        }
+      }
+    }
+  }
+}

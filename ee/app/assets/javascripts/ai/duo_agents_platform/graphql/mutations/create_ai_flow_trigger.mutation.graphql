@@ -1,0 +1,12 @@
+# @feature_category: dap_triggers
+#import "../fragments/flow_trigger.fragment.graphql"
+
+mutation createAiFlowTrigger($input: AiFlowTriggerCreateInput!) {
+  aiFlowTriggerCreate(input: $input) {
+    aiFlowTrigger {
+      ...FlowTriggerFragment
+    }
+    errors
+    errorReason @gl_introduced(version: "19.6.0")
+  }
+}

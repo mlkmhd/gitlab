@@ -1,0 +1,15 @@
+# @feature_category: code_review_workflow
+query mrUserPermission($projectPath: ID!, $iid: String!) {
+  project(fullPath: $projectPath) {
+    id
+    mergeRequest(iid: $iid) {
+      draft
+      id
+      mergeableDiscussionsState
+      title
+      userPermissions {
+        updateMergeRequest
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+fragment ScanProfileFields on ScanProfileType {
+  id
+  name
+  description
+  scanType
+  gitlabRecommended
+  triggers
+  projectCount
+  triggerSettings {
+    triggerType
+    configuration {
+      ... on SastConfiguration {
+        secureAnalyzersPrefix
+        imageSuffix
+        analyzerImageTag
+        excludedAnalyzers
+        excludedPaths
+        advancedSastPartialScan
+        gitlabAdvSastIncrScan
+      }
+      ... on DependencyScanningConfiguration {
+        secureAnalyzersPrefix
+        additionalCaCertBundle
+        secureLogLevel
+        excludedPaths
+        includeDevDependencies
+        maxDepth
+        pipDependencyPath
+        staticReachabilityEnabled
+        enableManifestFallback
+        pipcompileLockfileFileNamePattern
+        pipManifestFileNamePattern
+        enableVulnerabilityScan
+        apiTimeout
+        apiScanDownloadDelay
+        mavenDependencyPluginVersion
+        mavenArgs
+        gradleCliOpts
+        disabledResolutionJobs
+        mavenResolutionImage
+        gradleResolutionImage
+        pythonResolutionImage
+        pipIndexUrl
+        pipExtraIndexUrl
+        searchIgnoreHiddenDirs
+        analyzerImageVersion @gl_introduced(version: "19.6.0")
+      }
+      ... on SecretDetectionConfiguration {
+        secureAnalyzersPrefix
+        imageSuffix
+        historicScan
+        logOptions
+        excludedPaths
+        rulesetGitReference
+      }
+      ... on SastFalsePositiveConfiguration {
+        severityLevel
+        runMode
+      }
+      ... on SastVulnerabilityResolutionConfiguration {
+        severityLevel
+        runMode
+      }
+      ... on SecretDetectionFalsePositiveConfiguration {
+        severityLevel
+        runMode
+      }
+      ... on AutoRemediationConfiguration {
+        severityLevel
+        upgradePolicy
+        openMergeRequestsLimit
+        cooldown
+      }
+    }
+  }
+}

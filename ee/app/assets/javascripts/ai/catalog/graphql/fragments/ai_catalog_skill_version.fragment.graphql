@@ -1,0 +1,10 @@
+#import "./ai_catalog_item_version.fragment.graphql"
+
+fragment BaseAiCatalogSkillVersion on AiCatalogSkillVersion {
+  ...BaseAiCatalogItemVersion
+  path
+  gitRef
+  blobSha
+  commitSha
+  authorName
+}

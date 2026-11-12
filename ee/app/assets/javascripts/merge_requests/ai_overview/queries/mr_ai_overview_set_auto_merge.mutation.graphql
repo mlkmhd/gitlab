@@ -1,0 +1,19 @@
+#import "./mr_ai_overview_fields.fragment.graphql"
+
+# @feature_category: code_review_workflow
+mutation mrAiOverviewSetAutoMerge(
+  $projectPath: ID!
+  $iid: String!
+  $sha: String!
+  $strategy: MergeStrategyEnum!
+  $squash: Boolean!
+) {
+  mergeRequestAccept(
+    input: { projectPath: $projectPath, iid: $iid, sha: $sha, strategy: $strategy, squash: $squash }
+  ) {
+    mergeRequest {
+      ...MrAiOverviewFields
+    }
+    errors
+  }
+}

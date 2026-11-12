@@ -1,0 +1,20 @@
+# @feature_category: duo_agent_platform
+
+query getAgentSessionLocation($workflowId: AiDuoWorkflowsWorkflowID!) {
+  duoWorkflowWorkflows(workflowId: $workflowId) {
+    edges {
+      node {
+        id
+        project {
+          id
+        }
+        webPath @gl_introduced(version: "19.6.0")
+        namespace @gl_introduced(version: "19.6.0") {
+          id
+          name
+          webPath
+        }
+      }
+    }
+  }
+}

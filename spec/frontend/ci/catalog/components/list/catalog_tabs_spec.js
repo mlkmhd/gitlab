@@ -1,0 +1,133 @@
+import { GlTab, GlTabs, GlLoadingIcon } from '@gitlab/ui';
+import { shallowMount } from '@vue/test-utils';
+import { extendedWrapper } from 'helpers/vue_test_utils_helper';
+import setWindowLocation from 'helpers/set_window_location_helper';
+import { trimText } from 'helpers/text_helper';
+import { useMockInternalEventsTracking } from 'helpers/tracking_internal_events_helper';
+import CatalogTabs from '~/ci/catalog/components/list/catalog_tabs.vue';
+import { SCOPE } from '~/ci/catalog/constants';
+
+describe('Catalog Tabs', () => {
+  let wrapper;
+
+  const defaultProps = {
+    isLoading: false,
+    resourceCounts: {
+      all: 11,
+      namespaces: 4,
+      analytics: 0,
+    },
+  };
+
+  const findAllTab = () => wrapper.findByTestId('resources-all-tab');
+  const findGroupResourcesTab = () => wrapper.findByTestId('resources-group-tab');
+  const findAnalyticsTab = () => wrapper.findByTestId('resources-analytics-tab');
+  const findLoadingIcons = () => wrapper.findAllComponents(GlLoadingIcon);
+
+  const triggerTabChange = (index) => wrapper.findComponent(GlTabs).vm.$emit('input', index);
+  const triggerTabClick = (index) => wrapper.findAllComponents(GlTab).at(index).vm.$emit('click');
+
+  const createComponent = ({ props = defaultProps } = {}) => {
+    wrapper = extendedWrapper(
+      shallowMount(CatalogTabs, {
+        propsData: {
+          ...props,
+        },
+      }),
+    );
+  };
+
+  describe('When count queries are loading', () => {
+    beforeEach(() => {
+      createComponent({ props: { ...defaultProps, isLoading: true } });
+    });
+
+    it('renders loading icons', () => {
+      expect(findLoadingIcons()).toHaveLength(3);
+    });
+  });
+
+  describe('When both tabs have resources', () => {
+    beforeEach(() => {
+      createComponent();
+    });
+
+    it('renders All tab with count', () => {
+      expect(trimText(findAllTab().text())).toBe(`All ${defaultProps.resourceCounts.all}`);
+    });
+
+    it('renders group resources tab with count', () => {
+      expect(trimText(findGroupResourcesTab().text())).toBe(
+        `Your groups ${defaultProps.resourceCounts.namespaces}`,
+      );
+    });
+
+    it('renders resources analytics tab with count', () => {
+      expect(trimText(findAnalyticsTab().text())).toBe(
+        `Analytics ${defaultProps.resourceCounts.analytics}`,
+      );
+    });
+
+    describe('internal event tracking', () => {
+      const { bindInternalEventDocument } = useMockInternalEventsTracking();
+
+      it('tracks click_analytics_tab_on_ci_catalog when analytics tab is clicked', () => {
+        const { trackEventSpy } = bindInternalEventDocument(wrapper.element);
+
+        triggerTabClick(2);
+
+        expect(trackEventSpy).toHaveBeenCalledWith(
+          'click_analytics_tab_on_ci_catalog',
+          {},
+          undefined,
+        );
+      });
+
+      it('does not track events when other tabs are clicked', () => {
+        const { trackEventSpy } = bindInternalEventDocument(wrapper.element);
+
+        triggerTabClick(0);
+        triggerTabClick(1);
+
+        expect(trackEventSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    it.each`
+      tabIndex | scope               | name            | minAccessLevel
+      ${0}     | ${SCOPE.all}        | ${'all'}        | ${undefined}
+      ${1}     | ${SCOPE.namespaces} | ${'namespaces'} | ${undefined}
+      ${2}     | ${SCOPE.namespaces} | ${'analytics'}  | ${'MAINTAINER'}
+    `(
+      'emits tab-change with scope $scope, name $name and minAccessLevel $minAccessLevel on tab change',
+      ({ tabIndex, scope, name, minAccessLevel }) => {
+        triggerTabChange(tabIndex);
+
+        expect(wrapper.emitted()).toEqual({
+          'tab-change': [[{ scope, name, minAccessLevel }]],
+        });
+      },
+    );
+  });
+
+  describe('when the URL has a tab query parameter', () => {
+    const { bindInternalEventDocument } = useMockInternalEventsTracking();
+
+    beforeEach(() => {
+      setWindowLocation('?tab=analytics');
+      createComponent();
+    });
+
+    it('activates that tab', () => {
+      expect(wrapper.findComponent(GlTabs).props('value')).toBe(2);
+    });
+
+    it('does not track a tab click', () => {
+      const { trackEventSpy } = bindInternalEventDocument(wrapper.element);
+
+      triggerTabChange(2);
+
+      expect(trackEventSpy).not.toHaveBeenCalled();
+    });
+  });
+});
