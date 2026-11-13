@@ -2,11 +2,11 @@
 
 [Publish GitLab CE to GHCR](https://github.com/mlkmhd/gitlab/actions/workflows/gitlab-ce-release.yml) builds the tagged commit and frontend assets with Omnibus on Ubuntu 24.04. It installs the CE package with upstream Docker packaging, verifies the installed source revision, and publishes a Linux amd64 image.
 
-## Configure the runner
+## Runner and package access
 
-1. Make a dedicated Linux x64 self-hosted runner available to this repository, or use a larger Ubuntu x64 GitHub-hosted runner if available on your plan. Size it for native dependency compilation, frontend asset compilation, and Docker layers. A standard GitHub-hosted runner has only 14 GB of storage. Keep a self-hosted release runner limited to trusted workflows. [GitHub runner specifications](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job).
-1. Under **Settings > Secrets and variables > Actions > Variables**, set `OMNIBUS_RUNNER` to the runner label. The runner needs Bash, Git, a local Docker Engine with BuildKit, and access to the public Omnibus sources and dependency registries.
-1. If the GHCR package already exists with independent permissions, give this repository write access under the package's **Manage Actions access** settings. The workflow authenticates using GitHub's automatic `GITHUB_TOKEN`. [GitHub Packages access control](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
+GitHub Actions assigns a standard `ubuntu-24.04` runner by default. For builds that exceed its storage or compute capacity, set the optional `OMNIBUS_RUNNER` repository variable to the label of a larger Linux x64 runner with Docker and BuildKit. [GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+If the GHCR package already exists with independent permissions, give this repository write access under the package's **Manage Actions access** settings. The workflow authenticates using GitHub's automatic `GITHUB_TOKEN`. [GitHub Packages access control](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
 
 ## Publish a version
 
